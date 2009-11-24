@@ -1,5 +1,5 @@
 (* pp: -parser OcamlRevised *)
-	type loc = Loc.t
+  type loc = Loc.t
    and meta_bool =
     [ BTrue
     | BFalse
@@ -29,7 +29,7 @@
     | TyId  of loc and ident (* i *) (* Lazy.t *) (** Type identifier *)
     | TyMan of loc and ctyp and ctyp (* t == t *) (* type t = [ A | B ] == Foo.t *) (** Type manifest *)
     | TyDcl of loc and string and list ctyp and ctyp and list (ctyp * ctyp) (* type t 'a 'b 'c = t constraint t = t constraint t = t *) (** Type declaration *)
-    | TyObj of loc and ctyp and meta_bool (* < (t)? (..)? > *) (* < move : int -> 'a .. > as 'a  *) (** 	Object type *)
+    | TyObj of loc and ctyp and meta_bool (* < (t)? (..)? > *) (* < move : int -> 'a .. > as 'a  *) (**   Object type *)
     | TyOlb of loc and string and ctyp (* ?s:t *) (** Optional label type *)
     | TyPol of loc and ctyp and ctyp (* ! t . t *) (* ! 'a . list 'a -> 'a *) (** Polymorphic type *)
     | TyQuo of loc and string (* 's *)
@@ -57,7 +57,7 @@
     | TyAnt of loc and string (* $s$ *) (** Antiquotation *)
     ]
    and patt = (* The type of patterns                                       *)
-    [ PaNil of loc (** 	Empty pattern *)
+    [ PaNil of loc (**   Empty pattern *)
     | PaId  of loc and ident (* i *) (** Identifier *)
     | PaAli of loc and patt and patt (* p as p *) (* (Node x y as n) *) (** Alias *)
     | PaAnt of loc and string (* $s$ *) (** Antiquotation *)
@@ -87,7 +87,7 @@
     | PaLaz of loc and patt (* lazy p *) ]
   and expr = (* The type of expressions                                    *)
     [ ExNil of loc (** Empty expression *)
-    | ExId  of loc and ident (* i *) (** 	Identifier *)
+    | ExId  of loc and ident (* i *) (**   Identifier *)
     | ExAcc of loc and expr and expr (* e.e *) (** Access in module *)
     | ExAnt of loc and string (* $s$ *) (** Antiquotation *)
     | ExApp of loc and expr and expr (* e e *) (** Application *)
