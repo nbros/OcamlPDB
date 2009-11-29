@@ -59,15 +59,22 @@ let read_magic_number in_chan =
 				magic_number expected)
 ;;
 
-let deserialize file =
-	let in_chan = open_in_bin file in
+let deserialize_chan in_chan =
 	read_magic_number in_chan;
 	let ast = (input_value in_chan :> Ast.str_item) in
 	close_in in_chan;
 	ast;;
 
+let deserialize_file file =
+	let in_chan = open_in_bin file in
+	deserialize_chan in_chan;;
+
 let print_file_ast file =
-	let parse_tree = deserialize file in
+	let parse_tree = deserialize_file file in
 	print_endline (string_of_struct_item parse_tree);;
 
-print_file_ast "C:\\cygwin\\home\\Nicolas\\char.ast"
+let print_ast_chan channel =
+	let parse_tree = deserialize_chan channel in
+	print_endline (string_of_struct_item parse_tree);;
+
+(*print_file_ast "C:\\cygwin\\home\\Nicolas\\char.ast"*)
