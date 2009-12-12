@@ -1,0 +1,6 @@
+libraries (-libs):
+unix,dynlink,camlp4/camlp4lib
+
+compiler flags:
+-I +camlp4 -I +unix -I +dynlink
+
