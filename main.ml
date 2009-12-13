@@ -1,5 +1,9 @@
-(* main loop: reads commands on the standard input, and prints results on  *)
-(* the standard output                                                     *)
+(* main loop: reads commands on the standard input, and prints results on the standard output *)
+
+(** print the "end of text" character and flush the output *)
+let print_eot	() =
+	print_char '\003';
+	flush stdout
 
 let rec handle_command command commands = match commands with
 	| (c, f) :: _ when c = command -> f()
@@ -59,7 +63,8 @@ let cmd_print_ast_xml_input () =
 		Buffer.add_string buffer line;
 		Buffer.add_string buffer "\n"
 	done;
-	print_endline (ASTToXML.print_ast_in_xml (parse_input (Buffer.contents buffer)))
+	print_endline (ASTToXML.print_ast_in_xml (parse_input (Buffer.contents buffer)));
+	print_eot ()
 ;;
 
 let commands = [
@@ -76,6 +81,10 @@ let commands = [
 (* handle_command "ast" commands;; *)
 
 let _ =
+	(* signal that the indexer is successfully started *)
+	print_endline "ok";
+	print_eot();
+	(* main loop: wait for commands on the standard input and print results on the standard output *)
 	while true do
 		let line = read_line() in
 		handle_command line commands

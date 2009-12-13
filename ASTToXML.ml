@@ -7,8 +7,20 @@ let pp = Format.fprintf
 let string_of_loc loc =
 	(string_of_int (Loc.start_off loc)) ^ "," ^ (string_of_int (Loc.stop_off loc))
 
-(* TODO: escape XML chars *)
-let escape_string str: string = str
+let lt = (Str.regexp "<")
+let gt = (Str.regexp ">")
+let amp = (Str.regexp "&")
+let apos = (Str.regexp "'")
+let quot = (Str.regexp "\"")
+
+(* escape XML chars *)
+let escape_string str: string = 
+	let str = Str.global_replace lt "&lt;" str in
+	let str = Str.global_replace gt "&gt;" str in
+	let str = Str.global_replace amp "&amp;" str in
+	let str = Str.global_replace apos "&apos;" str in
+	let str = Str.global_replace quot "&quot;" str in
+	str
 
 let string_of_metabool = function
 	| BTrue -> "true"
