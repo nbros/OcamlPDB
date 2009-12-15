@@ -14,7 +14,7 @@ let apos = (Str.regexp "'")
 let quot = (Str.regexp "\"")
 
 (* escape XML chars *)
-let escape_string str: string = 
+let escape_string str: string =
 	let str = Str.global_replace lt "&lt;" str in
 	let str = Str.global_replace gt "&gt;" str in
 	let str = Str.global_replace amp "&amp;" str in
@@ -489,7 +489,9 @@ and print_option_ident f = function
 	| OAnt(str) -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
 
 let print_ast_in_xml channel =
-	let parse_tree = Deserializerp4.deserialize_chan channel in
-	print_str_item Format.str_formatter parse_tree;
-	Format.flush_str_formatter ()
+	match Deserializerp4.deserialize_chan channel with
+	| Some parse_tree ->
+			print_str_item Format.str_formatter parse_tree;
+			Format.flush_str_formatter ()
+	| None -> ""
 

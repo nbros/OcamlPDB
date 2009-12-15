@@ -27,22 +27,24 @@ let parse_file filepath =
 	Unix.in_channel_of_descr p_stdout
 
 let parse_input str =
-	let (p_stdout, camlp4_stdout) = Unix.pipe() in
-	(* TODO: named pipe on systems that support it, instead of temp file *)
-	let (temp_file_name, temp_file_outchan) = Filename.open_temp_file "ocaide" ".ml" in
-	Pervasives.at_exit (fun () ->
-					try
-						close_out temp_file_outchan;
-						Sys.remove temp_file_name
-					with
-						_ -> ());
-	output_string temp_file_outchan str;
-	close_out temp_file_outchan;
-	let _ = Unix.create_process
-			"camlp4" [| "camlp4"; "-parser"; "Ocaml"; "-printer"; "Camlp4AstDumper"; temp_file_name |]
-			Unix.stdin camlp4_stdout Unix.stderr in
-	Unix.close camlp4_stdout;
-	Unix.in_channel_of_descr p_stdout
+	try
+		let (p_stdout, camlp4_stdout) = Unix.pipe() in
+		(* TODO: named pipe on systems that support it, instead of temp file *)
+		let (temp_file_name, temp_file_outchan) = Filename.open_temp_file "ocaide" ".ml" in
+		Pervasives.at_exit (fun () ->
+						try
+							close_out temp_file_outchan;
+							Sys.remove temp_file_name
+						with
+							_ -> ());
+		output_string temp_file_outchan str;
+		close_out temp_file_outchan;
+		let _ = Unix.create_process
+				"camlp4" [| "camlp4"; "-parser"; "Ocaml"; "-printer"; "Camlp4AstDumper"; temp_file_name |]
+				Unix.stdin camlp4_stdout Unix.stderr in
+		Unix.close camlp4_stdout;
+		Some (Unix.in_channel_of_descr p_stdout)
+	with End_of_file -> None;;
 
 let cmd_print_ast_xml () =
 	let filepath = read_line() in
@@ -63,7 +65,9 @@ let cmd_print_ast_xml_input () =
 		Buffer.add_string buffer line;
 		Buffer.add_string buffer "\n"
 	done;
-	print_endline (ASTToXML.print_ast_in_xml (parse_input (Buffer.contents buffer)));
+	(match parse_input (Buffer.contents buffer) with
+		| Some channel -> print_endline (ASTToXML.print_ast_in_xml (channel));
+		| None -> ());
 	print_eot ()
 ;;
 
