@@ -1,23 +1,23 @@
 (* main loop: reads commands on the standard input, and prints results on the standard output *)
-
+ 
 (** print the "end of text" character and flush the output *)
 let print_eot	() =
 	print_char '\003';
 	flush stdout
-
+ 
 let rec handle_command command commands = match commands with
 	| (c, f) :: _ when c = command -> f()
 	| x :: r -> handle_command command r
 	| [] -> prerr_endline ("Command not understood: " ^ command);;
-
+ 
 let cmd_end () =
 	print_endline "Exiting...";
 	exit 0;;
-
+ 
 let cmd_print () =
 	let str = read_line() in
 	print_endline str;;
-
+ 
 let parse_file filepath =
 	let (p_stdout, camlp4_stdout) = Unix.pipe() in
 	let _ = Unix.create_process
@@ -25,7 +25,7 @@ let parse_file filepath =
 			Unix.stdin camlp4_stdout Unix.stderr in
 	Unix.close camlp4_stdout;
 	Unix.in_channel_of_descr p_stdout
-
+ 
 let parse_input str =
 	try
 		let (p_stdout, camlp4_stdout) = Unix.pipe() in
@@ -45,12 +45,18 @@ let parse_input str =
 		Unix.close camlp4_stdout;
 		Some (Unix.in_channel_of_descr p_stdout)
 	with End_of_file -> None;;
-
+ 
 let cmd_print_ast_xml () =
 	let filepath = read_line() in
 	print_endline (ASTToXML.print_ast_in_xml (parse_file filepath))
 ;;
 
+let cmd_print_occvar_xml () =
+	let argument = read_line() in
+		let filepath = read_line() in
+			print_endline (ASTToXML3.print_ast_in_xml (parse_file filepath) argument)
+;;
+ 
 let cmd_print_ast_xml_input () =
 	let strNLines = read_line() in
 	let nLines =
@@ -70,7 +76,7 @@ let cmd_print_ast_xml_input () =
 		| None -> ());
 	print_eot ()
 ;;
-
+ 
 let commands = [
 	("end", cmd_end);
 	("exit", cmd_end);
@@ -78,12 +84,13 @@ let commands = [
 	("print", cmd_print);
 	("astFromFile", cmd_print_ast_xml);
 	("astFromInput", cmd_print_ast_xml_input);
+	("astOccVar", cmd_print_occvar_xml);
 	("ast", cmd_print_ast_xml_input)
 	]
 ;;
-
+ 
 (* handle_command "ast" commands;; *)
-
+ 
 let _ =
 	(* signal that the indexer is successfully started *)
 	print_endline "ok";
