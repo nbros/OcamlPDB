@@ -10,6 +10,7 @@ let evaluated = ref false
 let maxlevel = ref 0
 let lastvarlevel = ref 0
 let lastExpr = ref ""
+let varloc = ref 0
 
 let string_of_loc loc =
 	(string_of_int (Loc.start_off loc)) ^ "," ^ (string_of_int (Loc.stop_off loc))
@@ -34,32 +35,29 @@ let escape_string str: string =
 	str
 
 let string_of_metabool = function
-	| BTrue -> "true"
-	| BFalse -> "false"
-	| BAnt _ -> "?"
+	| BTrue -> ""
+	| BFalse -> ""
+	| BAnt _ -> ""
 
 let print_meta_bool f = function
-	| BTrue -> pp f "true"
-	| BFalse -> pp f "false"
-	| BAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+	| BTrue -> ()
+	| BFalse -> ()
+	| BAnt str -> ()
 
 let rec print_strings f = function
 	| LNil -> pp f ""
-	| LCons(str, r) -> pp f "<string>%s</string>%a" str print_strings r
-	| LAnt(str) -> pp f "<antiquotation/>%s</antiquotation>" (escape_string str)
+	| LCons(str, r) -> ()
+	| LAnt(str) -> ()
 
 let rec print_ident f = function (* The type of identifiers (including path like Foo(X).Bar.y) *)
 	(* i . i *) (** Access in module *)
 	| IdAcc(loc, ident1, ident2) -> 
 			lastExpr := "IdAcc";
-			pp f ("<IdAcc loc='%s'><ident1>%a</ident1><ident2>%a</ident2></IdAcc>") (string_of_loc loc) print_ident ident1 print_ident ident2;
+			print_ident f ident1;
+			print_ident f ident2;
 			lastExpr := ""
 	(* i i *) (** Application *)
-	| IdApp(loc, ident1, ident2) -> 
-		begin
-			(*updatelevel;*)
-			pp f "<IdApp loc='%s'><ident1>%a</ident1><ident2>%a</ident2></IdApp>" (string_of_loc loc) print_ident ident1 print_ident ident2;
-		end
+	| IdApp(loc, ident1, ident2) ->	pp f "<IdApp loc='%s'><ident1>%a</ident1><ident2>%a</ident2></IdApp>" (string_of_loc loc) print_ident ident1 print_ident ident2
 		
 	(* foo *) (** Lowercase identifier *)
 	| IdLid(loc, name) -> 
@@ -84,14 +82,33 @@ let rec print_ident f = function (* The type of identifiers (including path like
 					pp f "<IdLid loc='%s' level='%s'><name>%s</name></IdLid>" (string_of_loc loc) (string_of_int !level) (escape_string name);
 				end
 				else
-					pp f "<IdLid loc='%s'><name>%s</name></IdLid>" (string_of_loc loc) (escape_string name);
+					();
 		end
 		
 	(* Bar *) (** Uppercase identifier *)
 	| IdUid(loc, name) ->
 		begin
-			(*updatelevel;*)
-			pp f "<IdUid loc='%s'><name>%s</name></IdUid>" (string_of_loc loc) (escape_string name);
+			let name = (escape_string name) in
+				if (name = !varname) then
+				begin
+					begin
+					match !lastExpr with
+						| "IdAcc" -> level := !lastvarlevel
+						| _ -> ()
+					end;
+					if (!evaluate) then
+							begin
+								level := !level + 1;
+								if (!level > !maxlevel) then
+									maxlevel := !level;
+								evaluate := false;
+								evaluated := true
+							end;
+					(*updatelevel;*)
+					pp f "<IdUid loc='%s' level='%s'><name>%s</name></IdUid>" (string_of_loc loc) (string_of_int !level) (escape_string name);
+				end
+				else
+					();
 		end
 		
 	(* $s$ *) (** Antiquotation *)
@@ -179,7 +196,7 @@ and print_patt f = function (* The type of patterns                             
 	(**   Empty pattern *)
 	| PaNil(loc) -> pp f "<PaNil loc='%s'/>" (string_of_loc loc)
 	(* i *) (** Identifier *)
-	| PaId(loc, ident1) -> pp f "<PaId loc='%s'><ident>%a</ident></PaId>" (string_of_loc loc) print_ident ident1
+	| PaId(loc, ident1) -> print_ident f ident1
 	(* p as p *) (* (Node x y as n) *) (** Alias *)
 	| PaAli(loc, patt1, patt2) -> pp f "<PaAli loc='%s'><patt1>%a</patt1><patt2>%a</patt2></PaAli>" (string_of_loc loc) print_patt patt1 print_patt patt2
 	(* $s$ *) (** Antiquotation *)
@@ -237,7 +254,7 @@ and print_expr f = function (* The type of expressions                          
 	| ExNil(loc) -> pp f "<ExNil loc='%s'/>" (string_of_loc loc)
 	(* i *) (**   Identifier *)
 	| ExId(loc, ident1) -> 
-		pp f "<ExId loc='%s'><ident>%a</ident></ExId>" (string_of_loc loc) print_ident ident1;
+		print_ident f ident1;
 	(* e.e *) (** Access in module *)
 	| ExAcc(loc, expr1, expr2) -> pp f "<ExAcc loc='%s'><expr1>%a</expr1><expr2>%a</expr2></ExAcc>" (string_of_loc loc) print_expr expr1 print_expr expr2
 	(* $s$ *) (** Antiquotation *)
@@ -245,7 +262,8 @@ and print_expr f = function (* The type of expressions                          
 	(* e e *) (** Application *)
 	| ExApp(loc, expr1, expr2) -> 
 		(*level := !level + 1;*)
-		pp f "<ExApp loc='%s'><expr1>%a</expr1><expr2>%a</expr2></ExApp>" (string_of_loc loc) print_expr expr1 print_expr expr2;
+		print_expr f expr1;
+		print_expr f expr2;
 		(*level := !level - 1*)
 	(* e.(e) *) (** Array access *)
 	| ExAre(loc, expr1, expr2) -> pp f "<ExAre loc='%s'><expr1>%a</expr1><expr2>%a</expr2></ExAre>" (string_of_loc loc) print_expr expr1 print_expr expr2
@@ -272,7 +290,7 @@ and print_expr f = function (* The type of expressions                          
 	(* if e then e else e *) (** if/then/else *)
 	| ExIfe(loc, expr1, expr2, expr3) -> pp f "<ExIfe loc='%s'><expr1>%a</expr1><expr2>%a</expr2><expr3>%a</expr3></ExIfe>" (string_of_loc loc) print_expr expr1 print_expr expr2 print_expr expr3
 	(* 42 *) (** Int *)
-	| ExInt(loc, name) -> pp f "<ExInt loc='%s'><name>%s</name></ExInt>" (string_of_loc loc) (escape_string name)
+	| ExInt(loc, name) -> ()
 	(** Int32 *)
 	| ExInt32(loc, name) -> pp f "<ExInt32 loc='%s'><name>%s</name></ExInt32>" (string_of_loc loc) (escape_string name)
 	(** Int64 *)
@@ -289,7 +307,9 @@ and print_expr f = function (* The type of expressions                          
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
-		pp f "<ExLet loc='%s'><rec>%a</rec><binding>%a</binding><expr>%a</expr></ExLet>" (string_of_loc loc) print_meta_bool meta_bool1 print_binding binding1 print_expr expr1;
+		print_meta_bool f meta_bool1;
+		print_binding f binding1;
+		print_expr f expr1;
 		if (!evaluated) then
 			begin
 				level := !level - 1;
@@ -390,7 +410,7 @@ and print_binding f = function (* The type of let bindings                      
 	(* bi, bi *) (* let a = 42, print_c f = function 43 *)
 	| BiAnd(loc, binding1, binding2) -> pp f "<BiAnd loc='%s'><binding1>%a</binding1><binding2>%a</binding2></BiAnd>" (string_of_loc loc) print_binding binding1 print_binding binding2
 	(* p = e *) (* let patt = expr *)
-	| BiEq(loc, patt1, expr1) -> pp f "<BiEq loc='%s'><patt>%a</patt><expr>%a</expr></BiEq>" (string_of_loc loc) print_patt patt1 print_expr expr1
+	| BiEq(loc, patt1, expr1) -> print_patt f patt1; print_expr f expr1
 	(* $s$ *)
 	| BiAnt(loc, name) -> pp f "<BiAnt loc='%s'><name>%s</name></BiAnt>" (string_of_loc loc) (escape_string name)
 and print_rec_binding f = function (* The type of record definitions                             *)
@@ -432,7 +452,7 @@ and print_module_expr f = function (* The type of module expressions            
 	(* functor (s : mt)) -> me *)
 	| MeFun(loc, name, module_type1, module_expr1) -> pp f "<MeFun loc='%s'><name>%s</name><module_type>%a</module_type><module_expr>%a</module_expr></MeFun>" (string_of_loc loc) (escape_string name) print_module_type module_type1 print_module_expr module_expr1
 	(* struct st end *)
-	| MeStr(loc, str_item1) -> pp f "<MeStr loc='%s'><str_item>%a</str_item></MeStr>" (string_of_loc loc) print_str_item str_item1
+	| MeStr(loc, str_item1) -> print_str_item f str_item1
 	(* (me : mt) *)
 	| MeTyc(loc, module_expr1, module_type1) -> pp f "<MeTyc loc='%s'><module_expr1>%a</module_expr1><module_type1>%a</module_type1></MeTyc>" (string_of_loc loc) print_module_expr module_expr1 print_module_type module_type1
 	(* $s$ *)
@@ -445,20 +465,20 @@ and print_str_item f = function (* The type of structure items                  
 	(* class type cict *)
 	| StClt(loc, class_type1) -> pp f "<StClt loc='%s'><class_type>%a</class_type></StClt>" (string_of_loc loc) print_class_type class_type1
 	(* st ; st *)
-	| StSem(loc, str_item1, str_item2) -> pp f "<StSem loc='%s'><str_item1>%a</str_item1><str_item2>%a</str_item2></StSem>" (string_of_loc loc) print_str_item str_item1 print_str_item str_item2
+	| StSem(loc, str_item1, str_item2) -> print_str_item f str_item1; print_str_item f str_item2
 	(* # s or # s e *)
 	| StDir(loc, name, expr1) -> pp f "<StDir loc='%s'><name>%s</name><expr>%a</expr></StDir>" (string_of_loc loc) (escape_string name) print_expr expr1
 	(* exception t or exception t = i *)
 	| StExc(loc, ctyp1, option_ident) -> pp f "<StExc loc='%s'><ctyp>%a</ctyp><option_ident>%a</option_ident></StExc>" (string_of_loc loc) print_ctyp ctyp1 print_option_ident option_ident
 	(* e *)
-	| StExp(loc, expr1) -> pp f "<StExp loc='%s'><expr>%a</expr></StExp>" (string_of_loc loc) print_expr expr1
+	| StExp(loc, expr1) -> print_expr f expr1
 	(* external s : t = s ... s *)
 	| StExt(loc, name, ctyp1, (*TODO*) strings(*meta_list string*)) -> pp f "<StExt loc='%s'><name>%s</name><ctyp>%a</ctyp><strings>%a</strings></StExt>" (string_of_loc loc) (escape_string name) print_ctyp ctyp1 print_strings strings
 	(* include me *)
 	| StInc(loc, module_expr1) -> pp f "<StInc loc='%s'><module_expr>%a</module_expr></StInc>" (string_of_loc loc) print_module_expr module_expr1
 	(* module s = me *)
 	| StMod(loc, name, module_expr1) -> 
-		pp f "<StMod loc='%s'><name>%s</name><module_expr1>%a</module_expr1></StMod>" (string_of_loc loc) (escape_string name) print_module_expr module_expr1;
+		print_module_expr f module_expr1;
 		lastvarlevel := !maxlevel;
 		level := !maxlevel;
 		
@@ -476,7 +496,8 @@ and print_str_item f = function (* The type of structure items                  
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
-		pp f "<StVal loc='%s'><rec>%a</rec><binding>%a</binding></StVal>" (string_of_loc loc) print_meta_bool meta_bool1 print_binding binding1;
+		print_meta_bool f meta_bool1; 
+		print_binding f binding1;
 		if (!evaluated) then
 			begin
 				level := !level -1;
@@ -572,8 +593,9 @@ and print_option_ident f = function
 	| OSome(x) -> pp f "<ident>%a</ident>" print_ident x
 	| OAnt(str) -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
 
-let print_ast_in_xml channel argument =
+let print_ast_in_xml channel argument argument2=
 	varname := argument;
+	varloc := int_of_string argument2;
 	match Deserializerp4.deserialize_chan channel with
 	| Some parse_tree ->
 			print_str_item Format.str_formatter parse_tree;
