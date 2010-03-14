@@ -10,6 +10,7 @@ let evaluated = ref false
 let maxlevel = ref 0
 let lastvarlevel = ref 0
 let lastExpr = ref ""
+let varloc = ref 0
 
 let string_of_loc loc =
 	(string_of_int (Loc.start_off loc)) ^ "," ^ (string_of_int (Loc.stop_off loc))
@@ -572,8 +573,9 @@ and print_option_ident f = function
 	| OSome(x) -> pp f "<ident>%a</ident>" print_ident x
 	| OAnt(str) -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
 
-let print_ast_in_xml channel argument =
+let print_ast_in_xml channel argument argument2=
 	varname := argument;
+	varloc := int_of_string argument2;
 	match Deserializerp4.deserialize_chan channel with
 	| Some parse_tree ->
 			print_str_item Format.str_formatter parse_tree;

@@ -53,8 +53,9 @@ let cmd_print_ast_xml () =
 
 let cmd_print_occvar_xml () =
 	let argument = read_line() in
-		let filepath = read_line() in
-			print_endline (ASTToXML3.print_ast_in_xml (parse_file filepath) argument)
+		let argument2 = read_line() in
+			let filepath = read_line() in
+				print_endline (ASTVarOcc.print_astvarocc_in_xml (parse_file filepath) argument argument2)
 ;;
  
 let cmd_print_ast_xml_input () =
