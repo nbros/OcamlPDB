@@ -109,7 +109,7 @@ let commands = [
 	("astFromFile", cmd_print_ast_xml);
 	("astFromInput", cmd_print_ast_xml_input);
 	("astOccVarFromFile", cmd_print_occvar_xml);
-	("astOccVarFromInput", cmd_print_occvar_xml);
+	("astOccVarFromInput", cmd_print_occvar_xml_input);
 	("ast", cmd_print_ast_xml_input)
 	]
 ;;
