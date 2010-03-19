@@ -61,8 +61,6 @@ let cmd_print_occvar_xml () =
  
 let cmd_print_occvar_xml_input () =
 	let strNLines = read_line() in
-		let argument = read_line() in
-	  	let argument2 = read_line() in
 	let nLines =
 		try
 			int_of_string (strNLines)
@@ -75,6 +73,8 @@ let cmd_print_occvar_xml_input () =
 		Buffer.add_string buffer line;
 		Buffer.add_string buffer "\n"
 	done;
+	let argument = read_line() in
+	let argument2 = read_line() in
 	(match parse_input (Buffer.contents buffer) with
 		| Some channel -> print_endline (ASTVarOcc.print_ast_in_xml (channel) argument argument2);
 		| None -> ());
