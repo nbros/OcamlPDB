@@ -58,6 +58,28 @@ let cmd_print_occvar_xml () =
 			  print_endline (ASTVarOcc.print_ast_in_xml (parse_file filepath) argument argument2)
 ;;
  
+let cmd_print_occvar_xml_input () =
+	let strNLines = read_line() in
+		let argument = read_line() in
+	  	let argument2 = read_line() in
+	let nLines =
+		try
+			int_of_string (strNLines)
+		with Failure "int_of_string" ->
+				failwith ("Wrong input: expected number of lines, got '" ^ strNLines ^ "'")
+	in
+	let buffer = Buffer.create 10000 in
+	for i = 1 to nLines do
+		let line = read_line() in
+		Buffer.add_string buffer line;
+		Buffer.add_string buffer "\n"
+	done;
+	(match parse_input (Buffer.contents buffer) with
+		| Some channel -> print_endline (ASTVarOcc.print_ast_in_xml (channel) argument argument2);
+		| None -> ());
+	print_eot ()
+;;
+
 let cmd_print_ast_xml_input () =
 	let strNLines = read_line() in
 	let nLines =
