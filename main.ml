@@ -55,7 +55,8 @@ let cmd_print_occvar_xml () =
 	let argument = read_line() in
 	  let argument2 = read_line() in
 		  let filepath = read_line() in
-			  print_endline (ASTVarOcc.print_ast_in_xml (parse_file filepath) argument argument2)
+			  print_endline (ASTVarOcc.print_ast_in_xml (parse_file filepath) argument argument2);
+				print_eot ()
 ;;
  
 let cmd_print_occvar_xml_input () =
@@ -107,7 +108,8 @@ let commands = [
 	("print", cmd_print);
 	("astFromFile", cmd_print_ast_xml);
 	("astFromInput", cmd_print_ast_xml_input);
-	("astOccVar", cmd_print_occvar_xml);
+	("astOccVarFromFile", cmd_print_occvar_xml);
+	("astOccVarFromInput", cmd_print_occvar_xml);
 	("ast", cmd_print_ast_xml_input)
 	]
 ;;

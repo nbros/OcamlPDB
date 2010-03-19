@@ -3,16 +3,24 @@ open PreCast
 open Ast
 
 let pp = Format.fprintf
-let level = ref 0
-let varname = ref ""
-let varloc = ref ""
+
+(* Initialize variable *)
+let level = ref 0 (* level of the current var *)
+let varname = ref "" 
+let varloc = ref "" 
 let varlevel = ref 0
-let evaluate = ref false
-let evaluated = ref false
-let maxlevel = ref 0
-let lastvarlevel = ref 0
-let lastExpr = ref ""
-let listvars = ref [(0, "")]
+let varwrite = ref false (* var status (read or write) *)
+let evaluate = ref false (* indicate if we need to increase level (not the same var)*)
+let evaluated = ref false (* indicate that the level increased *)
+let accessmodule = ref false
+let modulename = ref ""
+let varlevelfoundinmodule = ref 0 (* varlevel found in module *)
+let listmodule = ref [("", 0)]
+let maxlevel = ref 0 (* var maxlevel *)
+let lastvarlevel = ref 0 (* lastlevel found *)
+let lastExpr = ref "" (* last expression found *)
+let listvars = ref [(0, "")] (* list of all vars *)
+let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
 
 let string_of_loc loc =
 	(string_of_int (Loc.start_off loc)) ^ "," ^ (string_of_int (Loc.stop_off loc))
@@ -23,10 +31,7 @@ let amp = (Str.regexp "&")
 let apos = (Str.regexp "'")
 let quot = (Str.regexp "\"")
 
-(*let updatelevel =
-	if (!lastStval) then
-		level := !level + 1*)
-		
+	
 (* escape XML chars *)
 let escape_string str: string =
 	let str = Str.global_replace lt "&lt;" str in
@@ -54,10 +59,16 @@ let rec print_strings f = function
 let rec print_ident f = function (* The type of identifiers (including path like Foo(X).Bar.y) *)
 	(* i . i *) (** Access in module *)
 	| IdAcc(loc, ident1, ident2) -> 
+
 			lastExpr := "IdAcc";
-			print_ident f ident1;
-			print_ident f ident2;
-			lastExpr := ""
+			let currlevel = !level in
+				level := !lastvarlevel;
+				print_ident f ident1;
+				accessmodule := true;
+				print_ident f ident2;
+				level := currlevel;
+				accessmodule := false;
+				lastExpr := ""
 	(* i i *) (** Application *)
 	| IdApp(loc, ident1, ident2) ->	print_ident f ident1; print_ident f ident2
 		
@@ -67,14 +78,14 @@ let rec print_ident f = function (* The type of identifiers (including path like
 			let name = (escape_string name) in
 				if (name = !varname) then
 				begin
-					begin
+					(*begin
 					match !lastExpr with
 						| "IdAcc" -> level := !lastvarlevel
 						| _ -> ()
-					end;
+					end;*)
 					if (!evaluate) then
 							begin
-								level := !level + 1;
+								level := !maxlevel + 1;
 								if (!level > !maxlevel) then
 									maxlevel := !level;
 								evaluate := false;
@@ -82,12 +93,29 @@ let rec print_ident f = function (* The type of identifiers (including path like
 							end;
 							if (!varloc = (string_of_loc loc)) then
 									varlevel := !level;
-							let string = "<var loc='"^(string_of_loc loc)^"'><name>"^(escape_string name)^"</name></var>" in
-								listvars := List.append !listvars ((!level, string)::[]);
+							let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
+								if (!lastExpr = "IdAcc") then
+								begin
+									if (!accessmodule) then
+									begin
+										try
+											let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
+												listvars := List.append !listvars ((correctlevel, string)::[]);
+												
+										with
+											| Not_found -> ()
+									end
+								end
+								else
+									listvars := List.append !listvars ((!level, string)::[]);
+							varwrite := false;
 					(*pp f "<IdLid loc='%s' level='%s'><name>%s</name></IdLid>" (string_of_loc loc) (string_of_int !level) (escape_string name);*)
 				end
 				else
-					();
+					if (!evaluate) then
+						evaluate := false
+					else
+						();
 		end
 		
 	(* Bar *) (** Uppercase identifier *)
@@ -96,14 +124,14 @@ let rec print_ident f = function (* The type of identifiers (including path like
 			let name = (escape_string name) in
 				if (name = !varname) then
 				begin
-					begin
+					(*begin
 					match !lastExpr with
 						| "IdAcc" -> level := !lastvarlevel
 						| _ -> ()
-					end;
+					end;*)
 					if (!evaluate) then
 							begin
-								level := !level + 1;
+								level := !maxlevel + 1;
 								if (!level > !maxlevel) then
 									maxlevel := !level;
 								evaluate := false;
@@ -111,12 +139,28 @@ let rec print_ident f = function (* The type of identifiers (including path like
 							end;
 					if (!varloc = (string_of_loc loc)) then
 									varlevel := !level;
-					let string = "<var loc='"^(string_of_loc loc)^"'><name>"^(escape_string name)^"</name></var>" in
-								listvars := List.append !listvars ((!level, string)::[]);
-					(*pp f "<IdUid loc='%s' level='%s'><name>%s</name></IdUid>" (string_of_loc loc) (string_of_int !level) (escape_string name);*)
+						
+					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^name^"</name></var>" in
+						if (!lastExpr = "IdAcc") then
+						begin
+							
+							(*if (!accessmodule) then
+							begin
+										try
+											let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
+												listvars := List.append !listvars ((correctlevel, string)::[]);
+										with
+											| Not_found -> ()
+						  end
+							else*)
+								modulename := name;
+						end
+						else
+							listvars := List.append !listvars ((!level, string)::[]);
+					varwrite := false;
 				end
 				else
-					();
+					modulename := name;
 		end
 		
 	(* $s$ *) (** Antiquotation *)
@@ -260,7 +304,10 @@ and print_expr f = function (* The type of expressions                          
 	| ExId(loc, ident1) -> 
 		print_ident f ident1;
 	(* e.e *) (** Access in module *)
-	| ExAcc(loc, expr1, expr2) -> (* ??? *)pp f "<ExAcc loc='%s'><expr1>%a</expr1><expr2>%a</expr2></ExAcc>" (string_of_loc loc) print_expr expr1 print_expr expr2
+	| ExAcc(loc, expr1, expr2) -> 
+		evaluate := false;
+		print_expr f expr1;
+		print_expr f expr2
 	(* $s$ *) (** Antiquotation *)
 	| ExAnt(loc, name) -> ()
 	(* e e *) (** Application *)
@@ -278,7 +325,7 @@ and print_expr f = function (* The type of expressions                          
 	(* assert e *) (** assert e *)
 	| ExAsr(loc, expr1) -> print_expr f expr1
 	(* e := e *) (** Assignment *)
-	| ExAss(loc, expr1, expr2) -> print_expr f expr1; print_expr f expr2
+	| ExAss(loc, expr1, expr2) -> evaluate := false; varwrite := true; print_expr f expr1; print_expr f expr2
 	(* 'c' *) (** Character *)
 	| ExChr(loc, name) -> ()
 	(* (e : t) or (e : t :> t) *) (** Coercion *)
@@ -292,6 +339,7 @@ and print_expr f = function (* The type of expressions                          
 	(* if e then e else e *) (** if/then/else *)
 	| ExIfe(loc, expr1, expr2, expr3) -> 
 		evaluate := false;
+		varwrite := false;
 		print_expr f expr1; print_expr f expr2; print_expr f expr3
 	(* 42 *) (** Int *)
 	| ExInt(loc, name) -> ()
@@ -307,10 +355,10 @@ and print_expr f = function (* The type of expressions                          
 	| ExLaz(loc, expr1) -> print_expr f expr1
 	(* let b in e or let rec b in e *) (** Let statement with/without recursion *)
 	| ExLet(loc, meta_bool1, binding1, expr1) -> 
-		level := !maxlevel (*+ 1*);
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
+		varwrite := true;
 		print_meta_bool f meta_bool1;
 		print_binding f binding1;
 		print_expr f expr1;
@@ -318,8 +366,7 @@ and print_expr f = function (* The type of expressions                          
 			begin
 				level := !level - 1;
 				evaluated := false
-			end;
-		level := !level (*- 1*)
+			end;		
 	
 	(* let module s = me in e *) (** "Let module in" construct *)
 	| ExLmd(loc, name, module_expr1, expr1) -> print_module_expr f module_expr1; print_expr f expr1
@@ -356,6 +403,7 @@ and print_expr f = function (* The type of expressions                          
 	(* while e do { e } *) (** "While .. do" constraint *)
 	| ExWhi(loc, expr1, expr2) -> 
 		evaluate := false;
+		varwrite := false;
 		print_expr f expr1; print_expr f expr2
 and print_module_type f = function (* The type of module types                                   *)
 	| MtNil(loc) -> ()
@@ -483,10 +531,15 @@ and print_str_item f = function (* The type of structure items                  
 	(* include me *)
 	| StInc(loc, module_expr1) -> print_module_expr f module_expr1
 	(* module s = me *)
-	| StMod(loc, name, module_expr1) -> 
+	| StMod(loc, name, module_expr1) ->
+		modulename := escape_string name;
+		let length_atPre = List.length !listvars in 
 		print_module_expr f module_expr1;
+		if (List.length !listvars != length_atPre) then
+			listmodule := List.append !listmodule ((!modulename, !maxlevel)::[]);
 		lastvarlevel := !maxlevel;
 		level := !maxlevel;
+		modulename := ""
 		
 	(* module rec mb *)
 	| StRecMod(loc, module_binding1) -> print_module_binding f module_binding1
@@ -498,18 +551,16 @@ and print_str_item f = function (* The type of structure items                  
 	| StTyp(loc, ctyp1) -> print_ctyp f ctyp1
 	(* value (rec)? bi *)
 	| StVal(loc, meta_bool1, binding1) -> 
-		level := !maxlevel (*+ 1*);
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
-		print_meta_bool f meta_bool1; 
+		varwrite := true;
+		print_meta_bool f meta_bool1;
 		print_binding f binding1;
 		if (!evaluated) then
 			begin
-				level := !level -1;
 				evaluated := false
 			end;
-		(*level := !level - 1*)
 		
 	(* $s$ *)
 	| StAnt(loc, name) -> ()
@@ -600,22 +651,32 @@ and print_option_ident f = function
 	| OAnt(str) -> ()
 
 let print_ast_in_xml channel argument argument2=
+	
+	(* Initialize variables *)
 	level := 0;
   varname := "";
   varloc := "";
   varlevel :=  0;
   evaluate := false;
   evaluated := false;
+	modulename := "";
+	accessmodule := false;
+	varlevelfoundinmodule := 0;
+	listmodule := [];
   maxlevel := 0;
   lastvarlevel := 0;
   lastExpr := "";
   listvars := [];
 	varname := argument;
 	varloc := argument2;
+	
 	match Deserializerp4.deserialize_chan channel with
 	| Some parse_tree ->
-			print_str_item Format.str_formatter parse_tree;
+			if (not(List.exists (fun x -> x = !varname) dontwant)) then
+				print_str_item Format.str_formatter parse_tree;
 			print_endline "<varocc>";
+			
+			(* write all vars with the search level *)
 			let currlist = ref !listvars in
 			  while((List.length !currlist)>0) do
 					let elem = (List.hd !currlist) in
