@@ -335,7 +335,16 @@ and print_expr f = function (* The type of expressions                          
 	(* for s = e to/downto e do { e } *) (** For loop *)
 	| ExFor(loc, name, expr1, expr2, meta_bool1, expr3) -> print_expr f expr1; print_expr f expr2; print_meta_bool f meta_bool1; print_expr f expr3
 	(* fun [ mc ] *) (** Function with match case *)
-	| ExFun(loc, match_case1) -> print_match_case f match_case1
+	| ExFun(loc, match_case1) -> 
+		if (!level > !maxlevel) then
+			maxlevel := !level;
+		evaluate := true;
+		varwrite := true;
+		print_match_case f match_case1;
+		if (!evaluated) then
+			begin
+				evaluated := false
+			end;
 	(* if e then e else e *) (** if/then/else *)
 	| ExIfe(loc, expr1, expr2, expr3) -> 
 		evaluate := false;
