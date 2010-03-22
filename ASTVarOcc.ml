@@ -78,42 +78,44 @@ let rec print_ident f = function (* The type of identifiers (including path like
 			let name = (escape_string name) in
 				if (name = !varname) then
 				begin
+					(*print_string (!varname);
+					print_string ((string_of_int !level)^"\n");*)
 					(*begin
 					match !lastExpr with
 						| "IdAcc" -> level := !lastvarlevel
 						| _ -> ()
-					end;*)
+					end;*)(*print_endline ((string_of_bool !evaluate)^" "^(!varname)^" "^(string_of_int !level));*)
 					if (!evaluate) then
+					begin
+						level := !maxlevel + 1;
+						if (!level > !maxlevel) then
+							maxlevel := !level;
+						evaluate := false;
+						evaluated := true
+					end;
+					if (!varloc = (string_of_loc loc)) then
+							varlevel := !level;
+					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
+						if (!lastExpr = "IdAcc") then
+						begin
+							if (!accessmodule) then
 							begin
-								level := !maxlevel + 1;
-								if (!level > !maxlevel) then
-									maxlevel := !level;
-								evaluate := false;
-								evaluated := true
-							end;
-							if (!varloc = (string_of_loc loc)) then
-									varlevel := !level;
-							let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
-								if (!lastExpr = "IdAcc") then
-								begin
-									if (!accessmodule) then
-									begin
-										try
-											let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
-												listvars := List.append !listvars ((correctlevel, string)::[]);
+								try
+									let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
+										listvars := List.append !listvars ((correctlevel, string)::[]);
 												
-										with
-											| Not_found -> ()
-									end
-								end
-								else
-									listvars := List.append !listvars ((!level, string)::[]);
-							varwrite := false;
+								with
+									| Not_found -> ()
+							end
+						end
+						else
+							listvars := List.append !listvars ((!level, string)::[]);
+					varwrite := false;
 					(*pp f "<IdLid loc='%s' level='%s'><name>%s</name></IdLid>" (string_of_loc loc) (string_of_int !level) (escape_string name);*)
 				end
 				else
 					if (!evaluate) then
-						evaluate := false
+							evaluate := false
 					else
 						();
 		end
@@ -252,11 +254,14 @@ and print_patt f = function (* The type of patterns                             
 	(* _ *) (** Wildcard *)
 	| PaAny(loc) -> ()
 	(* p p *) (* fun x y) -> *) (** Application *)
-	| PaApp(loc, patt1, patt2) -> print_patt f patt1; print_patt f patt2
+	| PaApp(loc, patt1, patt2) -> evaluate:= true; print_patt f patt1; print_patt f patt2
 	(* [| p |] *) (** Array *)
 	| PaArr(loc, patt1) -> print_patt f patt1
 	(* p, p *) (** Comma-separated pattern list *)
-	| PaCom(loc, patt1, patt2) -> print_patt f patt1; print_patt f patt2
+	| PaCom(loc, patt1, patt2) -> 
+		print_patt f patt1; 
+		evaluate := true;
+		print_patt f patt2
 	(* p; p *) (** Semicolon-separated pattern list *)
 	| PaSem(loc, patt1, patt2) -> print_patt f patt1; print_patt f patt2
 	(* c *) (* 'x' *) (** Character *)
@@ -288,7 +293,9 @@ and print_patt f = function (* The type of patterns                             
 	(* s *) (** String *)
 	| PaStr(loc, name) -> ()
 	(* ( p ) *) (** Tuple *)
-	| PaTup(loc, patt1) -> print_patt f patt1
+	| PaTup(loc, patt1) -> 
+		lastExpr := "PaTup";
+		print_patt f patt1
 	(* (p : t) *) (** Type constraint *)
 	| PaTyc(loc, patt1, ctyp1) -> print_patt f patt1; print_ctyp f ctyp1
 	(* #i *)
@@ -312,6 +319,7 @@ and print_expr f = function (* The type of expressions                          
 	| ExAnt(loc, name) -> ()
 	(* e e *) (** Application *)
 	| ExApp(loc, expr1, expr2) -> 
+		varwrite := false;
 		print_expr f expr1;
 		print_expr f expr2;
 	(* e.(e) *) (** Array access *)
@@ -404,7 +412,9 @@ and print_expr f = function (* The type of expressions                          
 	(* (e) *) (** Tuple *)
 	| ExTup(loc, expr1) -> print_expr f expr1
 	(* e, e *) (** Comma-separated expression list *)
-	| ExCom(loc, expr1, expr2) -> print_expr f expr1; print_expr f expr2
+	| ExCom(loc, expr1, expr2) -> 
+		print_expr f expr1;
+		print_expr f expr2
 	(* (e : t) *) (** Type constraint *)
 	| ExTyc(loc, expr1, ctyp1) -> print_expr f expr1; print_ctyp f ctyp1
 	(* `s *) (** Polymorphic variant *)
@@ -562,6 +572,7 @@ and print_str_item f = function (* The type of structure items                  
 	| StVal(loc, meta_bool1, binding1) -> 
 		if (!level > !maxlevel) then
 			maxlevel := !level;
+		level := !maxlevel;
 		evaluate := true;
 		varwrite := true;
 		print_meta_bool f meta_bool1;
