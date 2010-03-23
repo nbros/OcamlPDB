@@ -61,12 +61,13 @@ let rec print_ident f = function (* The type of identifiers (including path like
 	| IdAcc(loc, ident1, ident2) -> 
 
 			lastExpr := "IdAcc";
-			let currlevel = !level in
-				level := !lastvarlevel;
+			(*let currlevel = !level in*)
+				(*level := !lastvarlevel;*)
+				(*level := !maxlevel;*)
 				print_ident f ident1;
 				accessmodule := true;
 				print_ident f ident2;
-				level := currlevel;
+				(*level := currlevel;*)
 				accessmodule := false;
 				lastExpr := ""
 	(* i i *) (** Application *)
@@ -93,8 +94,6 @@ let rec print_ident f = function (* The type of identifiers (including path like
 						evaluate := false;
 						evaluated := true
 					end;
-					if (!varloc = (string_of_loc loc)) then
-							varlevel := !level;
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
 						if (!lastExpr = "IdAcc") then
 						begin
@@ -103,13 +102,18 @@ let rec print_ident f = function (* The type of identifiers (including path like
 								try
 									let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
 										listvars := List.append !listvars ((correctlevel, string)::[]);
-												
+									if (!varloc = (string_of_loc loc)) then
+							 		  varlevel := correctlevel;		
 								with
 									| Not_found -> ()
 							end
 						end
 						else
-							listvars := List.append !listvars ((!level, string)::[]);
+						begin
+							if (!varloc = (string_of_loc loc)) then
+							  varlevel := !level;
+							listvars := List.append !listvars ((!level, string)::[])
+						end;
 					varwrite := false;
 					(*pp f "<IdLid loc='%s' level='%s'><name>%s</name></IdLid>" (string_of_loc loc) (string_of_int !level) (escape_string name);*)
 				end
@@ -126,19 +130,14 @@ let rec print_ident f = function (* The type of identifiers (including path like
 			let name = (escape_string name) in
 				if (name = !varname) then
 				begin
-					(*begin
-					match !lastExpr with
-						| "IdAcc" -> level := !lastvarlevel
-						| _ -> ()
-					end;*)
 					if (!evaluate) then
-							begin
-								level := !maxlevel + 1;
-								if (!level > !maxlevel) then
-									maxlevel := !level;
-								evaluate := false;
-								evaluated := true
-							end;
+					begin
+						level := !maxlevel + 1;
+						if (!level > !maxlevel) then
+							maxlevel := !level;
+						evaluate := false;
+						evaluated := true
+					end;
 					if (!varloc = (string_of_loc loc)) then
 									varlevel := !level;
 						
@@ -572,7 +571,7 @@ and print_str_item f = function (* The type of structure items                  
 	| StVal(loc, meta_bool1, binding1) -> 
 		if (!level > !maxlevel) then
 			maxlevel := !level;
-		level := !maxlevel;
+		(*level := !maxlevel;*)
 		evaluate := true;
 		varwrite := true;
 		print_meta_bool f meta_bool1;
