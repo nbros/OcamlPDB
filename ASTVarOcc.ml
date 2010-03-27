@@ -253,7 +253,7 @@ and print_patt f = function (* The type of patterns                             
 	(* _ *) (** Wildcard *)
 	| PaAny(loc) -> ()
 	(* p p *) (* fun x y) -> *) (** Application *)
-	| PaApp(loc, patt1, patt2) -> evaluate:= true; print_patt f patt1; print_patt f patt2
+	| PaApp(loc, patt1, patt2) -> evaluate:= true; print_patt f patt1; evaluate:=true;print_patt f patt2
 	(* [| p |] *) (** Array *)
 	| PaArr(loc, patt1) -> print_patt f patt1
 	(* p, p *) (** Comma-separated pattern list *)
@@ -371,6 +371,7 @@ and print_expr f = function (* The type of expressions                          
 	| ExLaz(loc, expr1) -> print_expr f expr1
 	(* let b in e or let rec b in e *) (** Let statement with/without recursion *)
 	| ExLet(loc, meta_bool1, binding1, expr1) -> 
+		let levelbefore = !level in
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
@@ -380,7 +381,7 @@ and print_expr f = function (* The type of expressions                          
 		print_expr f expr1;
 		if (!evaluated) then
 			begin
-				level := !level - 1;
+				level := levelbefore;
 				evaluated := false
 			end;		
 	
@@ -480,7 +481,7 @@ and print_with_constr f = function (* The type of `with' constraints            
 and print_binding f = function (* The type of let bindings                                   *)
 	| BiNil(loc) -> ()
 	(* bi, bi *) (* let a = 42, print_c f = function 43 *)
-	| BiAnd(loc, binding1, binding2) -> print_binding f binding1; print_binding f binding2
+	| BiAnd(loc, binding1, binding2) -> print_binding f binding1; evaluate:=true;print_binding f binding2
 	(* p = e *) (* let patt = expr *)
 	| BiEq(loc, patt1, expr1) -> print_patt f patt1; print_expr f expr1
 	(* $s$ *)
