@@ -6,9 +6,11 @@ let pp = Format.fprintf
 
 (* Initialize variable *)
 let level = ref 0 (* level of the current var *)
-let varname = ref "" 
-let varloc = ref "" 
-let varlevel = ref 0
+let varname = ref "" (* varname (searched var)*)
+let varloc = ref "" (* var location (searched var)*)
+let varlevel = ref 0 (* var level (searched var)*)
+let varExpr = ref ""
+let foundleft = ref false
 let varwrite = ref false (* var status (read or write) *)
 let evaluate = ref false (* indicate if we need to increase level (not the same var)*)
 let evaluated = ref false (* indicate that the level increased *)
@@ -19,7 +21,7 @@ let listmodule = ref [("", 0)]
 let maxlevel = ref 0 (* var maxlevel *)
 let lastvarlevel = ref 0 (* lastlevel found *)
 let lastExpr = ref "" (* last expression found *)
-let listvars = ref [(0, "")] (* list of all vars *)
+let listvars = ref [("",(0, ""))] (* list of all vars *)
 let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
 
 let string_of_loc loc =
@@ -40,21 +42,6 @@ let escape_string str: string =
 	let str = Str.global_replace apos "&apos;" str in
 	let str = Str.global_replace quot "&quot;" str in
 	str
-
-let string_of_metabool = function
-	| BTrue -> ()
-	| BFalse -> ()
-	| BAnt _ -> ()
-
-let print_meta_bool f = function
-	| BTrue -> ()
-	| BFalse -> ()
-	| BAnt str -> ()
-
-let rec print_strings f = function
-	| LNil -> pp f ""
-	| LCons(str, r) -> ()
-	| LAnt(str) -> ()
 
 let rec print_ident f = function (* The type of identifiers (including path like Foo(X).Bar.y) *)
 	(* i . i *) (** Access in module *)
@@ -79,19 +66,18 @@ let rec print_ident f = function (* The type of identifiers (including path like
 			let name = (escape_string name) in
 				if (name = !varname) then
 				begin
-					(*print_string (!varname);
-					print_string ((string_of_int !level)^"\n");*)
-					(*begin
-					match !lastExpr with
-						| "IdAcc" -> level := !lastvarlevel
-						| _ -> ()
-					end;*)(*print_endline ((string_of_bool !evaluate)^" "^(!varname)^" "^(string_of_int !level));*)
 					if (!evaluate) then
 					begin
 						level := !maxlevel + 1;
 						if (!level > !maxlevel) then
 							maxlevel := !level;
 						evaluate := false;
+						if (!lastExpr = "StValLeft") then
+						begin
+							foundleft := true;
+							level := !lastvarlevel + 1;
+							lastvarlevel := !level;
+						end;
 						evaluated := true
 					end;
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
@@ -101,9 +87,12 @@ let rec print_ident f = function (* The type of identifiers (including path like
 							begin
 								try
 									let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
-										listvars := List.append !listvars ((correctlevel, string)::[]);
+										listvars := List.append !listvars ((!lastExpr,(correctlevel, string))::[]);
 									if (!varloc = (string_of_loc loc)) then
-							 		  varlevel := correctlevel;		
+									begin
+							 		  varlevel := correctlevel;
+										varExpr := !lastExpr;
+									end;
 								with
 									| Not_found -> ()
 							end
@@ -111,15 +100,19 @@ let rec print_ident f = function (* The type of identifiers (including path like
 						else
 						begin
 							if (!varloc = (string_of_loc loc)) then
+							begin
 							  varlevel := !level;
-							listvars := List.append !listvars ((!level, string)::[])
+								varExpr := !lastExpr;
+							end;
+							listvars := List.append !listvars ((!lastExpr,(!level, string))::[])
 						end;
 					varwrite := false;
-					(*pp f "<IdLid loc='%s' level='%s'><name>%s</name></IdLid>" (string_of_loc loc) (string_of_int !level) (escape_string name);*)
 				end
 				else
 					if (!evaluate) then
-							evaluate := false
+					begin
+						evaluate := false
+					end
 					else
 						();
 		end
@@ -144,20 +137,10 @@ let rec print_ident f = function (* The type of identifiers (including path like
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^name^"</name></var>" in
 						if (!lastExpr = "IdAcc") then
 						begin
-							
-							(*if (!accessmodule) then
-							begin
-										try
-											let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
-												listvars := List.append !listvars ((correctlevel, string)::[]);
-										with
-											| Not_found -> ()
-						  end
-							else*)
 								modulename := name;
 						end
 						else
-							listvars := List.append !listvars ((!level, string)::[]);
+							listvars := List.append !listvars ((!lastExpr,(!level, string))::[]);
 					varwrite := false;
 				end
 				else
@@ -189,7 +172,7 @@ and print_ctyp f = function (* Representation of types                          
 	(* type t 'a 'b 'c = t constraint t = t constraint t = t *) (** Type declaration *)
 	| TyDcl(loc, name, ctyps, ctyp1, (*TODO*) constraints) -> print_ctyps f ctyps; print_ctyp f ctyp1; print_constraints f constraints
 	(* < (t)? (..)? > *) (* < move : int) -> 'a .. > as 'a  *) (**   Object type *)
-	| TyObj(loc, ctyp1, meta_bool1) -> print_ctyp f ctyp1; print_meta_bool f meta_bool1
+	| TyObj(loc, ctyp1, meta_bool1) -> print_ctyp f ctyp1;
 	(* ?s:t *) (** Optional label type *)
 	| TyOlb(loc, name, ctyp1) -> print_ctyp f ctyp1
 	(* ! t . t *) (* ! 'a . list 'a) -> 'a *) (** Polymorphic type *)
@@ -340,7 +323,7 @@ and print_expr f = function (* The type of expressions                          
 	(* 3.14 *) (** Float *)
 	| ExFlo(loc, name) -> ()
 	(* for s = e to/downto e do { e } *) (** For loop *)
-	| ExFor(loc, name, expr1, expr2, meta_bool1, expr3) -> print_expr f expr1; print_expr f expr2; print_meta_bool f meta_bool1; print_expr f expr3
+	| ExFor(loc, name, expr1, expr2, meta_bool1, expr3) -> print_expr f expr1; print_expr f expr2; print_expr f expr3
 	(* fun [ mc ] *) (** Function with match case *)
 	| ExFun(loc, match_case1) -> 
 		if (!level > !maxlevel) then
@@ -371,14 +354,16 @@ and print_expr f = function (* The type of expressions                          
 	| ExLaz(loc, expr1) -> print_expr f expr1
 	(* let b in e or let rec b in e *) (** Let statement with/without recursion *)
 	| ExLet(loc, meta_bool1, binding1, expr1) -> 
+		lastExpr := "ExLet";
 		let levelbefore = !level in
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
 		varwrite := true;
-		print_meta_bool f meta_bool1;
 		print_binding f binding1;
 		print_expr f expr1;
+		level := levelbefore;
+		lastExpr := "";
 		if (!evaluated) then
 			begin
 				level := levelbefore;
@@ -451,7 +436,7 @@ and print_sig_item f = function (* The type of signature items                  
 	(* exception t *)
 	| SgExc(loc, ctyp1) -> print_ctyp f ctyp1
 	(* external s : t = s ... s *)
-	| SgExt(loc, name, ctyp1, strings (*meta_list string*)) -> print_ctyp f ctyp1; print_strings f strings
+	| SgExt(loc, name, ctyp1, strings (*meta_list string*)) -> print_ctyp f ctyp1;
 	(* include mt *)
 	| SgInc(loc, module_type1) -> print_module_type f module_type1
 	(* module s : mt *)
@@ -483,7 +468,24 @@ and print_binding f = function (* The type of let bindings                      
 	(* bi, bi *) (* let a = 42, print_c f = function 43 *)
 	| BiAnd(loc, binding1, binding2) -> print_binding f binding1; evaluate:=true;print_binding f binding2
 	(* p = e *) (* let patt = expr *)
-	| BiEq(loc, patt1, expr1) -> print_patt f patt1; print_expr f expr1
+	| BiEq(loc, patt1, expr1) -> 
+		let decreased = ref false in
+		if (!lastExpr = "StVal" || !lastExpr = "ExLet") then
+			lastExpr := !lastExpr^"Left";
+		print_patt f patt1; 
+		if (!lastExpr = "StValLeft" && !foundleft) then
+		begin
+			decreased := true;
+			level := !level -1;
+			foundleft := false;
+			lastExpr := "StValRight"
+		end
+		else 
+			if (!lastExpr = "ExLetLeft") then
+				lastExpr := "ExLetRight";
+		print_expr f expr1;
+		if (!decreased = true) then
+			level := !level + 1;
 	(* $s$ *)
 	| BiAnt(loc, name) -> ()
 and print_rec_binding f = function (* The type of record definitions                             *)
@@ -546,7 +548,7 @@ and print_str_item f = function (* The type of structure items                  
 	(* e *)
 	| StExp(loc, expr1) -> print_expr f expr1
 	(* external s : t = s ... s *)
-	| StExt(loc, name, ctyp1, (*TODO*) strings(*meta_list string*)) -> print_ctyp f ctyp1; print_strings f strings
+	| StExt(loc, name, ctyp1, (*TODO*) strings(*meta_list string*)) -> print_ctyp f ctyp1;
 	(* include me *)
 	| StInc(loc, module_expr1) -> print_module_expr f module_expr1
 	(* module s = me *)
@@ -570,13 +572,16 @@ and print_str_item f = function (* The type of structure items                  
 	| StTyp(loc, ctyp1) -> print_ctyp f ctyp1
 	(* value (rec)? bi *)
 	| StVal(loc, meta_bool1, binding1) -> 
+		lastExpr := "StVal";
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		(*level := !maxlevel;*)
 		evaluate := true;
 		varwrite := true;
-		print_meta_bool f meta_bool1;
+		level := !level - 1;
 		print_binding f binding1;
+		level := !level + 1;
+		lastExpr := "";
 		if (!evaluated) then
 			begin
 				evaluated := false
@@ -587,7 +592,7 @@ and print_str_item f = function (* The type of structure items                  
 and print_class_type f = function (* The type of class types                                    *)
 	| CtNil(loc) -> ()
 	(* (virtual)? i ([ t ])? *)
-	| CtCon(loc, meta_bool1, ident1, ctyp1) -> print_meta_bool f meta_bool1; print_ident f ident1; print_ctyp f ctyp1
+	| CtCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f ident1; print_ctyp f ctyp1
 	(* [t]) -> ct *)
 	| CtFun(loc, ctyp1, class_type1) -> print_ctyp f ctyp1; print_class_type f class_type1
 	(* object ((t))? (csg)? end *)
@@ -609,11 +614,11 @@ and print_class_sig_item f = function (* The type of class signature items      
 	(* inherit ct *)
 	| CgInh(loc, class_type1) -> print_class_type f class_type1
 	(* method s : t or method private s : t *)
-	| CgMth(loc, name, meta_bool1, ctyp1) -> print_meta_bool f meta_bool1; print_ctyp f ctyp1
+	| CgMth(loc, name, meta_bool1, ctyp1) -> print_ctyp f ctyp1
 	(* value (virtual)? (mutable)? s : t *)
-	| CgVal(loc, name, meta_bool1, meta_bool2, ctyp1) -> print_meta_bool f meta_bool1; print_meta_bool f meta_bool2; print_ctyp f ctyp1
+	| CgVal(loc, name, meta_bool1, meta_bool2, ctyp1) -> print_ctyp f ctyp1
 	(* method virtual (mutable)? s : t *)
-	| CgVir(loc, name, meta_bool1, ctyp1) -> print_meta_bool f meta_bool1; print_ctyp f ctyp1
+	| CgVir(loc, name, meta_bool1, ctyp1) -> print_ctyp f ctyp1
 	(* $s$ *)
 	| CgAnt(loc, name) -> ()
 and print_class_expr f = function (* The type of class expressions                              *)
@@ -621,11 +626,11 @@ and print_class_expr f = function (* The type of class expressions              
 	(* ce e *)
 	| CeApp(loc, class_expr1, expr1) -> print_class_expr f class_expr1; print_expr f expr1
 	(* (virtual)? i ([ t ])? *)
-	| CeCon(loc, meta_bool1, ident1, ctyp1) -> print_meta_bool f meta_bool1; print_ident f ident1; print_ctyp f ctyp1
+	| CeCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f ident1; print_ctyp f ctyp1
 	(* fun p -> ce *)
 	| CeFun(loc, patt1, class_expr1) -> print_patt f patt1; print_class_expr f class_expr1
 	(* let (rec)? bi in ce *)
-	| CeLet(loc, meta_bool1, binding1, class_expr1) -> print_meta_bool f meta_bool1; print_binding f binding1; print_class_expr f class_expr1
+	| CeLet(loc, meta_bool1, binding1, class_expr1) -> print_binding f binding1; print_class_expr f class_expr1
 	(* object ((p))? (cst)? end *)
 	| CeStr(loc, patt1, class_str_item1) -> print_patt f patt1; print_class_str_item f class_str_item1
 	(* ce : ct *)
@@ -647,13 +652,13 @@ and print_class_str_item f = function (* The type of class structure items      
 	(* initializer e *)
 	| CrIni(loc, expr1) -> print_expr f expr1
 	(* method (private)? s : t = e or method (private)? s = e *)
-	| CrMth(loc, name, meta_bool1, expr1, ctyp1) -> print_meta_bool f meta_bool1; print_expr f expr1; print_ctyp f ctyp1
+	| CrMth(loc, name, meta_bool1, expr1, ctyp1) -> print_expr f expr1; print_ctyp f ctyp1
 	(* value (mutable)? s = e *)
-	| CrVal(loc, name, meta_bool1, expr1) -> print_meta_bool f meta_bool1; print_expr f expr1
+	| CrVal(loc, name, meta_bool1, expr1) -> print_expr f expr1
 	(* method virtual (private)? s : t *)
-	| CrVir(loc, name, meta_bool1, ctyp1) -> print_meta_bool f meta_bool1; print_ctyp f ctyp1
+	| CrVir(loc, name, meta_bool1, ctyp1) -> print_ctyp f ctyp1
 	(* value virtual (private)? s : t *)
-	| CrVvr(loc, name, meta_bool1, ctyp1) -> print_meta_bool f meta_bool1; print_ctyp f ctyp1
+	| CrVvr(loc, name, meta_bool1, ctyp1) -> print_ctyp f ctyp1
 	(* $s$ *)
 	| CrAnt(loc, name) -> ()
 
@@ -695,15 +700,34 @@ let print_ast_in_xml channel argument argument2=
 			if (not(List.exists (fun x -> x = !varname) dontwant)) then
 				print_str_item Format.str_formatter parse_tree;
 			print_endline "<varocc>";
-			
-			(* write all vars with the search level *)
-			let currlist = ref !listvars in
-			  while((List.length !currlist)>0) do
-					let elem = (List.hd !currlist) in
-						if (fst(elem) > 0 && fst(elem) == !varlevel) then
-							print_endline (snd(elem));
-					currlist := List.tl !currlist;
-				done;
+			print_endline !varExpr;
+			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
+			begin
+				(* write all vars with the search level *)
+				let currlist = ref !listvars in
+					if (List.exists (fun x -> fst(x) = "ExLetLeft" && fst(snd(x)) = !varlevel) !listvars) then
+						currlist := (List.filter (fun x -> fst(x) <> "ExLetLeft" && fst(x) <> "ExLetRight") !listvars);
+			  	while((List.length !currlist)>0) do
+						let elem = (List.hd !currlist) in
+					  	let level = fst(snd(elem)) in
+							if ( level> 0 && level == !varlevel) then
+								print_endline (snd(snd(elem)));
+						currlist := List.tl !currlist;
+					done;
+			end
+			else
+			begin
+				let currlist = ref !listvars in
+					if (List.exists (fun x -> fst(x) = "ExLetLeft" && fst(snd(x)) = !varlevel) !listvars) then
+						currlist := (List.filter (fun x -> fst(x) = "ExLetLeft" || fst(x) = "ExLetRight") !listvars);
+			  	while((List.length !currlist)>0) do
+						let elem = (List.hd !currlist) in
+							let level = fst(snd(elem)) in
+								if ( level> 0 && level == !varlevel) then
+									print_endline (snd(snd(elem)));
+								currlist := List.tl !currlist;
+					done;
+			end;
 			print_string "</varocc>";
 			Format.flush_str_formatter ()
 	| None -> ""
