@@ -360,7 +360,7 @@ and print_expr f = function (* The type of expressions                          
 			maxlevel := !level;
 		evaluate := true;
 		varwrite := true;
-		print_binding f binding1;
+		print_binding f false binding1;
 		print_expr f expr1;
 		level := levelbefore;
 		lastExpr := "";
@@ -463,10 +463,10 @@ and print_with_constr f = function (* The type of `with' constraints            
 	| WcAnd(loc, with_constr1, with_constr2) -> print_with_constr f with_constr1; print_with_constr f with_constr2
 	(* $s$ *)
 	| WcAnt(loc, name) -> ()
-and print_binding f = function (* The type of let bindings                                   *)
+and print_binding f isRec = function (* The type of let bindings                                   *)
 	| BiNil(loc) -> ()
 	(* bi, bi *) (* let a = 42, print_c f = function 43 *)
-	| BiAnd(loc, binding1, binding2) -> print_binding f binding1; evaluate:=true;print_binding f binding2
+	| BiAnd(loc, binding1, binding2) -> print_binding f isRec binding1; evaluate:=true;print_binding f isRec binding2
 	(* p = e *) (* let patt = expr *)
 	| BiEq(loc, patt1, expr1) -> 
 		let decreased = ref false in
@@ -476,7 +476,8 @@ and print_binding f = function (* The type of let bindings                      
 		if (!lastExpr = "StValLeft" && !foundleft) then
 		begin
 			decreased := true;
-			level := !level -1;
+			if (not(isRec)) then
+				level := !level -1;
 			foundleft := false;
 			lastExpr := "StValRight"
 		end
@@ -579,7 +580,7 @@ and print_str_item f = function (* The type of structure items                  
 		evaluate := true;
 		varwrite := true;
 		level := !level - 1;
-		print_binding f binding1;
+		print_binding f (meta_bool1 = BTrue) binding1;
 		level := !level + 1;
 		lastExpr := "";
 		if (!evaluated) then
@@ -630,7 +631,7 @@ and print_class_expr f = function (* The type of class expressions              
 	(* fun p -> ce *)
 	| CeFun(loc, patt1, class_expr1) -> print_patt f patt1; print_class_expr f class_expr1
 	(* let (rec)? bi in ce *)
-	| CeLet(loc, meta_bool1, binding1, class_expr1) -> print_binding f binding1; print_class_expr f class_expr1
+	| CeLet(loc, meta_bool1, binding1, class_expr1) -> print_binding f (meta_bool1 = BTrue) binding1; print_class_expr f class_expr1
 	(* object ((p))? (cst)? end *)
 	| CeStr(loc, patt1, class_str_item1) -> print_patt f patt1; print_class_str_item f class_str_item1
 	(* ce : ct *)
@@ -700,7 +701,6 @@ let print_ast_in_xml channel argument argument2=
 			if (not(List.exists (fun x -> x = !varname) dontwant)) then
 				print_str_item Format.str_formatter parse_tree;
 			print_endline "<varocc>";
-			print_endline !varExpr;
 			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
 			begin
 				(* write all vars with the search level *)
