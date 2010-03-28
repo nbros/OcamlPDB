@@ -475,9 +475,11 @@ and print_binding f isRec = function (* The type of let bindings                
 		print_patt f patt1; 
 		if (!lastExpr = "StValLeft" && !foundleft) then
 		begin
-			decreased := true;
 			if (not(isRec)) then
+			begin
+				decreased := true;
 				level := !level -1;
+			end;
 			foundleft := false;
 			lastExpr := "StValRight"
 		end
