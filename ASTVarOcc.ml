@@ -43,22 +43,22 @@ let escape_string str: string =
 	let str = Str.global_replace quot "&quot;" str in
 	str
 
-let rec print_ident f = function (* The type of identifiers (including path like Foo(X).Bar.y) *)
+let rec print_ident f isIdAcc = function (* The type of identifiers (including path like Foo(X).Bar.y) *)
 	(* i . i *) (** Access in module *)
 	| IdAcc(loc, ident1, ident2) -> 
 
-			lastExpr := "IdAcc";
+			(*lastExpr := "IdAcc";*)
 			(*let currlevel = !level in*)
 				(*level := !lastvarlevel;*)
 				(*level := !maxlevel;*)
-				print_ident f ident1;
+				print_ident f true ident1;
 				accessmodule := true;
-				print_ident f ident2;
+				print_ident f true ident2;
 				(*level := currlevel;*)
 				accessmodule := false;
-				lastExpr := ""
+			(*lastExpr := ""*)
 	(* i i *) (** Application *)
-	| IdApp(loc, ident1, ident2) ->	print_ident f ident1; print_ident f ident2
+	| IdApp(loc, ident1, ident2) ->	print_ident f false ident1; print_ident f false ident2
 		
 	(* foo *) (** Lowercase identifier *)
 	| IdLid(loc, name) -> 
@@ -81,7 +81,7 @@ let rec print_ident f = function (* The type of identifiers (including path like
 						evaluated := true
 					end;
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
-						if (!lastExpr = "IdAcc") then
+						if (isIdAcc) then
 						begin
 							if (!accessmodule) then
 							begin
@@ -135,7 +135,7 @@ let rec print_ident f = function (* The type of identifiers (including path like
 									varlevel := !level;
 						
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^name^"</name></var>" in
-						if (!lastExpr = "IdAcc") then
+						if (isIdAcc) then
 						begin
 								modulename := name;
 						end
@@ -162,11 +162,11 @@ and print_ctyp f = function (* Representation of types                          
 	(* t) -> t *) (* int) -> string *) (** Arrow *)
 	| TyArr(loc, ctyp1, ctyp2) -> print_ctyp f ctyp1; print_ctyp f ctyp2
 	(* #i *) (* #point *) (** Class type *)
-	| TyCls(loc, ident1) -> print_ident f ident1
+	| TyCls(loc, ident1) -> print_ident f false ident1
 	(* ~s:t *) (** Label type *)
 	| TyLab(loc, name, ctyp1) -> print_ctyp f ctyp1
 	(* i *) (* Lazy.t *) (** Type identifier *)
-	| TyId(loc, ident1) -> print_ident f ident1
+	| TyId(loc, ident1) -> print_ident f false ident1
 	(* t == t *) (* type t = [ A | B ] == Foo.t *) (** Type manifest *)
 	| TyMan(loc, ctyp1, ctyp2) -> print_ctyp f ctyp1; print_ctyp f ctyp2
 	(* type t 'a 'b 'c = t constraint t = t constraint t = t *) (** Type declaration *)
@@ -228,7 +228,7 @@ and print_patt f = function (* The type of patterns                             
 	(**   Empty pattern *)
 	| PaNil(loc) -> ()
 	(* i *) (** Identifier *)
-	| PaId(loc, ident1) -> print_ident f ident1
+	| PaId(loc, ident1) -> print_ident f false ident1
 	(* p as p *) (* (Node x y as n) *) (** Alias *)
 	| PaAli(loc, patt1, patt2) -> print_patt f patt1; print_patt f patt2
 	(* $s$ *) (** Antiquotation *)
@@ -271,7 +271,7 @@ and print_patt f = function (* The type of patterns                             
 	(* { p } *) (** Record *)
 	| PaRec(loc, patt1) -> print_patt f patt1
 	(* i = p *) (** Equality *)
-	| PaEq(loc, ident1, patt1) -> print_ident f ident1; print_patt f patt1
+	| PaEq(loc, ident1, patt1) -> print_ident f false ident1; print_patt f patt1
 	(* s *) (** String *)
 	| PaStr(loc, name) -> ()
 	(* ( p ) *) (** Tuple *)
@@ -281,7 +281,7 @@ and print_patt f = function (* The type of patterns                             
 	(* (p : t) *) (** Type constraint *)
 	| PaTyc(loc, patt1, ctyp1) -> print_patt f patt1; print_ctyp f ctyp1
 	(* #i *)
-	| PaTyp(loc, ident1) -> print_ident f ident1
+	| PaTyp(loc, ident1) -> print_ident f false ident1
 	(* `s *) (** Polymorphic variant *)
 	| PaVrn(loc, name) -> ()
 	(* lazy p *)
@@ -291,7 +291,7 @@ and print_expr f = function (* The type of expressions                          
 	| ExNil(loc) -> ()
 	(* i *) (**   Identifier *)
 	| ExId(loc, ident1) -> 
-		print_ident f ident1;
+		print_ident f false ident1;
 	(* e.e *) (** Access in module *)
 	| ExAcc(loc, expr1, expr2) -> 
 		evaluate := false;
@@ -375,7 +375,7 @@ and print_expr f = function (* The type of expressions                          
 	(* match e with [ mc ] *) (** Match case *)
 	| ExMat(loc, expr1, match_case1) -> print_expr f expr1; print_match_case f match_case1
 	(* new i *) (** New object *)
-	| ExNew(loc, ident1) -> print_ident f ident1
+	| ExNew(loc, ident1) -> print_ident f false ident1
 	(* object ((p))? (cst)? end *) (** Object declaration *)
 	| ExObj(loc, patt1, class_str_item1) -> print_patt f patt1; print_class_str_item f class_str_item1
 	(* ?s or ?s:e *) (** Optional label *)
@@ -412,7 +412,7 @@ and print_expr f = function (* The type of expressions                          
 and print_module_type f = function (* The type of module types                                   *)
 	| MtNil(loc) -> ()
 	(* i *) (* A.B.C *)
-	| MtId(loc, ident1) -> print_ident f ident1
+	| MtId(loc, ident1) -> print_ident f false ident1
 	(* functor (s : mt)) -> mt *)
 	| MtFun(loc, name, module_type1, module_type2) -> print_module_type f module_type1; print_module_type f module_type2
 	(* 's *)
@@ -446,7 +446,7 @@ and print_sig_item f = function (* The type of signature items                  
 	(* module type s = mt *)
 	| SgMty(loc, name, module_type1) -> print_module_type f module_type1
 	(* open i *)
-	| SgOpn(loc, ident1) -> print_ident f ident1
+	| SgOpn(loc, ident1) -> print_ident f false ident1
 	(* type t *)
 	| SgTyp(loc, ctyp1) -> print_ctyp f ctyp1
 	(* value s : t *)
@@ -458,7 +458,7 @@ and print_with_constr f = function (* The type of `with' constraints            
 	(* type t = t *)
 	| WcTyp(loc, ctyp1, ctyp2) -> print_ctyp f ctyp1; print_ctyp f ctyp2
 	(* module i = i *)
-	| WcMod(loc, ident1, ident2) -> print_ident f ident1; print_ident f ident2
+	| WcMod(loc, ident1, ident2) -> print_ident f false ident1; print_ident f false ident2
 	(* wc, wc *)
 	| WcAnd(loc, with_constr1, with_constr2) -> print_with_constr f with_constr1; print_with_constr f with_constr2
 	(* $s$ *)
@@ -495,7 +495,7 @@ and print_rec_binding f = function (* The type of record definitions            
 	(* rb ; rb *)
 	| RbSem(loc, rec_binding1, rec_binding2) -> print_rec_binding f rec_binding1; print_rec_binding f rec_binding2
 	(* i = e *)
-	| RbEq(loc, ident1, expr1) -> print_ident f ident1; print_expr f expr1
+	| RbEq(loc, ident1, expr1) -> print_ident f false ident1; print_expr f expr1
 	(* $s$ *)
 	| RbAnt(loc, name) -> ()
 and print_module_binding f = function (* The type of recursive module definitions                   *)
@@ -522,7 +522,7 @@ and print_module_expr f = function (* The type of module expressions            
 	(** Empty module expression *)
 	| MeNil(loc) -> ()
 	(* i *)
-	| MeId(loc, ident1) -> print_ident f ident1
+	| MeId(loc, ident1) -> print_ident f false ident1
 	(* me me *)
 	| MeApp(loc, module_expr1, module_expr2) -> print_module_expr f module_expr1; print_module_expr f module_expr2
 	(* functor (s : mt)) -> me *)
@@ -568,7 +568,7 @@ and print_str_item f = function (* The type of structure items                  
 	(* module type s = mt *)
 	| StMty(loc, name, module_type1) -> print_module_type f module_type1
 	(* open i *)
-	| StOpn(loc, ident1) -> print_ident f ident1
+	| StOpn(loc, ident1) -> print_ident f false ident1
 	(* type t *)
 	| StTyp(loc, ctyp1) -> print_ctyp f ctyp1
 	(* value (rec)? bi *)
@@ -593,7 +593,7 @@ and print_str_item f = function (* The type of structure items                  
 and print_class_type f = function (* The type of class types                                    *)
 	| CtNil(loc) -> ()
 	(* (virtual)? i ([ t ])? *)
-	| CtCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f ident1; print_ctyp f ctyp1
+	| CtCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f false ident1; print_ctyp f ctyp1
 	(* [t]) -> ct *)
 	| CtFun(loc, ctyp1, class_type1) -> print_ctyp f ctyp1; print_class_type f class_type1
 	(* object ((t))? (csg)? end *)
@@ -627,7 +627,7 @@ and print_class_expr f = function (* The type of class expressions              
 	(* ce e *)
 	| CeApp(loc, class_expr1, expr1) -> print_class_expr f class_expr1; print_expr f expr1
 	(* (virtual)? i ([ t ])? *)
-	| CeCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f ident1; print_ctyp f ctyp1
+	| CeCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f false ident1; print_ctyp f ctyp1
 	(* fun p -> ce *)
 	| CeFun(loc, patt1, class_expr1) -> print_patt f patt1; print_class_expr f class_expr1
 	(* let (rec)? bi in ce *)
@@ -673,7 +673,7 @@ and print_constraints f = function
 
 and print_option_ident f = function
 	| ONone -> pp f ""
-	| OSome(x) -> print_ident f x
+	| OSome(x) -> print_ident f false x
 	| OAnt(str) -> ()
 
 let print_ast_in_xml channel argument argument2=
@@ -701,6 +701,7 @@ let print_ast_in_xml channel argument argument2=
 			if (not(List.exists (fun x -> x = !varname) dontwant)) then
 				print_str_item Format.str_formatter parse_tree;
 			print_endline "<varocc>";
+			print_endline !varExpr;
 			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
 			begin
 				(* write all vars with the search level *)
