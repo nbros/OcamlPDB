@@ -20,6 +20,7 @@ let varlevelfoundinmodule = ref 0 (* varlevel found in module *)
 let listmodule = ref [("", 0)]
 let maxlevel = ref 0 (* var maxlevel *)
 let lastvarlevel = ref 0 (* lastlevel found *)
+let lastvarlevelExLet = ref 0
 let lastExpr = ref "" (* last expression found *)
 let listvars = ref [("",(0, ""))] (* list of all vars *)
 let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
@@ -77,6 +78,14 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							foundleft := true;
 							level := !lastvarlevel + 1;
 							lastvarlevel := !level;
+							lastvarlevelExLet := !level;
+						end
+						else
+						if (!lastExpr = "ExLetLeft") then
+						begin
+							foundleft := true;
+							level := !lastvarlevelExLet + 1;
+							lastvarlevelExLet := !level;
 						end;
 						evaluated := true
 					end;
@@ -104,7 +113,9 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							  varlevel := !level;
 								varExpr := !lastExpr;
 							end;
-							listvars := List.append !listvars ((!lastExpr,(!level, string))::[])
+							
+							listvars := List.append !listvars ((!lastExpr,(!level, string))::[])	
+							
 						end;
 					varwrite := false;
 				end
@@ -473,7 +484,7 @@ and print_binding f isRec = function (* The type of let bindings                
 		if (!lastExpr = "StVal" || !lastExpr = "ExLet") then
 			lastExpr := !lastExpr^"Left";
 		print_patt f patt1; 
-		if (!lastExpr = "StValLeft" && !foundleft) then
+		if ((!lastExpr = "StValLeft" || !lastExpr = "ExLetLeft") && !foundleft) then
 		begin
 			if (not(isRec)) then
 			begin
@@ -481,11 +492,12 @@ and print_binding f isRec = function (* The type of let bindings                
 				level := !level -1;
 			end;
 			foundleft := false;
-			lastExpr := "StValRight"
-		end
-		else 
 			if (!lastExpr = "ExLetLeft") then
-				lastExpr := "ExLetRight";
+				lastExpr := "ExLetRight"
+			else
+				lastExpr := "StValRight";
+		end;
+		
 		print_expr f expr1;
 		if (!decreased = true) then
 			level := !level + 1;
@@ -581,9 +593,9 @@ and print_str_item f = function (* The type of structure items                  
 		(*level := !maxlevel;*)
 		evaluate := true;
 		varwrite := true;
-		level := !level - 1;
+		(*level := !level - 1;*)
 		print_binding f (meta_bool1 = BTrue) binding1;
-		level := !level + 1;
+		(*level := !level + 1;*)
 		lastExpr := "";
 		if (!evaluated) then
 			begin
@@ -693,6 +705,7 @@ let print_ast_in_xml channel argument argument2=
 	listmodule := [];
   maxlevel := 0;
   lastvarlevel := 0;
+	lastvarlevelExLet := 0;
   lastExpr := "";
   listvars := [];
 	varname := argument;
