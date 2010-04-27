@@ -85,7 +85,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						begin
 							foundleft := true;
 							(*level := !lastvarlevelExLet + 1;*)
-							lastvarlevelExLet := !level+1;
+							(*lastvarlevelExLet := !level+1;*)
 						end;
 						evaluated := true
 					end;
@@ -124,7 +124,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 					begin
 						evaluate := false;
 						if (!lastExpr = "ExLetLeft") then
-							lastExpr := ""
+							foundleft := false
 					end
 					else
 						();
@@ -486,14 +486,14 @@ and print_binding f isRec = function (* The type of let bindings                
 		if (!lastExpr = "StVal" || !lastExpr = "ExLet") then
 			lastExpr := !lastExpr^"Left";
 		print_patt f patt1; 
-		if ((!lastExpr = "StValLeft" || !lastExpr = "ExLetLeft") && !foundleft) then
+		if ((!lastExpr = "StValLeft" || !lastExpr = "ExLetLeft")) then
 		begin
-			if (not(isRec)) then
+			if (not(isRec) && !foundleft) then
 			begin
 				decreased := true;
 				level := !level -1;
+				foundleft := false;
 			end;
-			foundleft := false;
 			if (!lastExpr = "ExLetLeft") then
 				lastExpr := "ExLetRight"
 			else
