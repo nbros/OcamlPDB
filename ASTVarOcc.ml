@@ -76,7 +76,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						if (!lastExpr = "StValLeft") then
 						begin
 							foundleft := true;
-							level := !lastvarlevel + 1;
+							(*level := !lastvarlevel + 1; ???????*)
 							lastvarlevel := !level;
 							lastvarlevelExLet := !level;
 						end
@@ -84,8 +84,8 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						if (!lastExpr = "ExLetLeft") then
 						begin
 							foundleft := true;
-							level := !lastvarlevelExLet + 1;
-							lastvarlevelExLet := !level;
+							(*level := !lastvarlevelExLet + 1;*)
+							lastvarlevelExLet := !level+1;
 						end;
 						evaluated := true
 					end;
@@ -122,7 +122,9 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 				else
 					if (!evaluate) then
 					begin
-						evaluate := false
+						evaluate := false;
+						if (!lastExpr = "ExLetLeft") then
+							lastExpr := ""
 					end
 					else
 						();
@@ -340,7 +342,7 @@ and print_expr f = function (* The type of expressions                          
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		evaluate := true;
-		varwrite := true;
+		varwrite := false;
 		print_match_case f match_case1;
 		if (!evaluated) then
 			begin
@@ -375,11 +377,11 @@ and print_expr f = function (* The type of expressions                          
 		print_expr f expr1;
 		level := levelbefore;
 		lastExpr := "";
-		if (!evaluated) then
+		(*if (!evaluated) then
 			begin
 				level := levelbefore;
 				evaluated := false
-			end;		
+			end;*)		
 	
 	(* let module s = me in e *) (** "Let module in" construct *)
 	| ExLmd(loc, name, module_expr1, expr1) -> print_module_expr f module_expr1; print_expr f expr1
