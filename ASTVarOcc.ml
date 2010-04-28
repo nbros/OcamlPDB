@@ -192,7 +192,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						isLoc := true;
 						varlevel := !level;
 					end;
-						
+				
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^name^"</name></var>" in
 						if (isIdAcc) then
 						begin
@@ -202,7 +202,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							listvars := List.append !listvars (new_variable(!lastExp, string, !level, !modulename, !isLoc)::[]);
 					varwrite := false;
 				end
-				else
+				else if (isIdAcc) then
 					modulename := name;
 		end
 		
@@ -797,10 +797,15 @@ let print_ast_in_xml channel argument argument2=
 						currlist := (List.filter (fun x -> x.isInModule = !varModule && not(x.expr="StValLeft" && x.isInModule <> !varModule)) !currlist);
 					end
 					else
-						if (!varExpr = "StValRight" && !varModule <> "") then
+						if (!varExpr = "StValRight") then
 						begin
-							(*if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "StValLeft") !currlist) then
-								currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;*)
+							if (!varModule <> "") then
+							begin
+								if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "StValLeft" && !varlevel = x.level) !currlist) then
+									currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
+								if (List.exists(fun x -> x.isInModule = !varModule && x.expr = "StValLeft" && !varlevel = x.level) !currlist) then
+									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist;
+							end
 				  (*currlist := List.filter (fun x -> x.letnumber = !varletnumber || x.expr = "StValLeft") !currlist;*)
 							(*if (List.exists (fun x -> x.expr = "StValLeft" && x.isInModule = !varModule) !currlist) then
 								currlist := (List.filter (fun x -> x.isInModule = !varModule) !currlist);
@@ -828,9 +833,9 @@ let print_ast_in_xml channel argument argument2=
 						
 						(*currlist := List.filter (fun x -> x.isInModule = !varModule && (x.expr = "ExLetLeft" || x.expr = "ExLetRight")) !currlist;
 						*)end;
-						(*if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "ExLetLeft") !currlist) then
-						*)(*	currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
-					*)(*if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !listvars) then
+						if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "ExLetLeft" && !varlevel = x.level) !currlist) then
+							currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
+					(*if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !listvars) then
 						currlist := (List.filter (fun x -> x.expr = "ExLetLeft" || x.expr = "ExLetRight") !listvars);
 			  	*)while((List.length !currlist)>0) do
 						let elem = (List.hd !currlist) in
