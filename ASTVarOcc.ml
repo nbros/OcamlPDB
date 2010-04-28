@@ -10,6 +10,7 @@ let varname = ref "" (* varname (searched var)*)
 let varloc = ref "" (* var location (searched var)*)
 let varlevel = ref 0 (* var level (searched var)*)
 let varExpr = ref ""
+let varInModule = ref false
 let foundleft = ref false
 let varwrite = ref false (* var status (read or write) *)
 let evaluate = ref false (* indicate if we need to increase level (not the same var)*)
@@ -101,6 +102,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 									begin
 							 		  varlevel := correctlevel;
 										varExpr := !lastExpr;
+										varInModule := true;
 									end;
 								with
 									| Not_found -> ()
@@ -570,13 +572,16 @@ and print_str_item f = function (* The type of structure items                  
 	| StInc(loc, module_expr1) -> print_module_expr f module_expr1
 	(* module s = me *)
 	| StMod(loc, name, module_expr1) ->
+		let levelbefore = !level in
 		modulename := escape_string name;
 		let length_atPre = List.length !listvars in 
 		print_module_expr f module_expr1;
 		if (List.length !listvars != length_atPre) then
 			listmodule := List.append !listmodule ((!modulename, !maxlevel)::[]);
 		lastvarlevel := !maxlevel;
-		level := !maxlevel;
+		(*level := !maxlevel;*)
+		maxlevel := levelbefore;
+		level := levelbefore;
 		modulename := ""
 		
 	(* module rec mb *)
