@@ -5,12 +5,26 @@ open Ast
 let pp = Format.fprintf
 
 (* Initialize variable *)
+type variable = {
+  expr: string;
+  xml: string;
+  level: int;
+	mutable isInModule: string;
+}
+let new_variable(e,x,l,iIM) = {
+  expr = e;
+  xml = x;
+  level = l;
+	isInModule = iIM;
+}
+
 let level = ref 0 (* level of the current var *)
 let varname = ref "" (* varname (searched var)*)
 let varloc = ref "" (* var location (searched var)*)
 let varlevel = ref 0 (* var level (searched var)*)
 let varExpr = ref ""
-let varInModule = ref false
+let varModule = ref ""
+let idIdAcc = ref false
 let foundleft = ref false
 let varwrite = ref false (* var status (read or write) *)
 let evaluate = ref false (* indicate if we need to increase level (not the same var)*)
@@ -22,8 +36,8 @@ let listmodule = ref [("", 0)]
 let maxlevel = ref 0 (* var maxlevel *)
 let lastvarlevel = ref 0 (* lastlevel found *)
 let lastvarlevelExLet = ref 0
-let lastExpr = ref "" (* last expression found *)
-let listvars = ref [("",(0, ""))] (* list of all vars *)
+let lastExpr = ref [""] (* last expression found *)
+let listvars = ref [new_variable("","",0,"")] (* list of all vars *)
 let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
 
 let string_of_loc loc =
@@ -66,6 +80,9 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 	| IdLid(loc, name) -> 
 		begin
 			let name = (escape_string name) in
+			let lastExp = ref "" in
+				if (List.length !lastExpr)> 0 then
+					lastExp := (List.hd !lastExpr);
 				if (name = !varname) then
 				begin
 					if (!evaluate) then
@@ -74,7 +91,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						if (!level > !maxlevel) then
 							maxlevel := !level;
 						evaluate := false;
-						if (!lastExpr = "StValLeft") then
+						if ((List.length !lastExpr)> 0 && (List.hd !lastExpr) = "StValLeft") then
 						begin
 							foundleft := true;
 							(*level := !lastvarlevel + 1; ???????*)
@@ -82,7 +99,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							lastvarlevelExLet := !level;
 						end
 						else
-						if (!lastExpr = "ExLetLeft") then
+						if ((List.length !lastExpr)> 0 && (List.hd !lastExpr) = "ExLetLeft") then
 						begin
 							foundleft := true;
 							(*level := !lastvarlevelExLet + 1;*)
@@ -97,13 +114,14 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							begin
 								try
 									let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
-										listvars := List.append !listvars ((!lastExpr,(correctlevel, string))::[]);
+										listvars := List.append !listvars (new_variable(!lastExp,string,correctlevel,!modulename)::[]);
 									if (!varloc = (string_of_loc loc)) then
 									begin
 							 		  varlevel := correctlevel;
-										varExpr := !lastExpr;
-										varInModule := true;
+										varExpr := !lastExp;
+										varModule := !modulename;
 									end;
+									modulename := "";
 								with
 									| Not_found -> ()
 							end
@@ -113,11 +131,10 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							if (!varloc = (string_of_loc loc)) then
 							begin
 							  varlevel := !level;
-								varExpr := !lastExpr;
+								varExpr := !lastExp;
+								varModule := !modulename;
 							end;
-							
-							listvars := List.append !listvars ((!lastExpr,(!level, string))::[])	
-							
+							listvars := List.append !listvars (new_variable(!lastExp,string,!level,!modulename)::[])	
 						end;
 					varwrite := false;
 				end
@@ -125,7 +142,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 					if (!evaluate) then
 					begin
 						evaluate := false;
-						if (!lastExpr = "ExLetLeft") then
+						if (!lastExp = "ExLetLeft") then
 							foundleft := false
 					end
 					else
@@ -136,6 +153,9 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 	| IdUid(loc, name) ->
 		begin
 			let name = (escape_string name) in
+			let lastExp = ref "" in
+				if (List.length !lastExpr)> 0 then
+					lastExp := (List.hd !lastExpr);
 				if (name = !varname) then
 				begin
 					if (!evaluate) then
@@ -155,7 +175,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 								modulename := name;
 						end
 						else
-							listvars := List.append !listvars ((!lastExpr,(!level, string))::[]);
+							listvars := List.append !listvars (new_variable(!lastExp, string, !level, !modulename)::[]);
 					varwrite := false;
 				end
 				else
@@ -291,7 +311,7 @@ and print_patt f = function (* The type of patterns                             
 	| PaStr(loc, name) -> ()
 	(* ( p ) *) (** Tuple *)
 	| PaTup(loc, patt1) -> 
-		lastExpr := "PaTup";
+		lastExpr := "PaTup"::!lastExpr;
 		print_patt f patt1
 	(* (p : t) *) (** Type constraint *)
 	| PaTyc(loc, patt1, ctyp1) -> print_patt f patt1; print_ctyp f ctyp1
@@ -369,7 +389,7 @@ and print_expr f = function (* The type of expressions                          
 	| ExLaz(loc, expr1) -> print_expr f expr1
 	(* let b in e or let rec b in e *) (** Let statement with/without recursion *)
 	| ExLet(loc, meta_bool1, binding1, expr1) -> 
-		lastExpr := "ExLet";
+		lastExpr := "ExLet"::!lastExpr;
 		let levelbefore = !level in
 		if (!level > !maxlevel) then
 			maxlevel := !level;
@@ -378,7 +398,7 @@ and print_expr f = function (* The type of expressions                          
 		print_binding f false binding1;
 		print_expr f expr1;
 		level := levelbefore;
-		lastExpr := "";
+		lastExpr := List.tl !lastExpr;
 		(*if (!evaluated) then
 			begin
 				level := levelbefore;
@@ -481,14 +501,23 @@ and print_with_constr f = function (* The type of `with' constraints            
 and print_binding f isRec = function (* The type of let bindings                                   *)
 	| BiNil(loc) -> ()
 	(* bi, bi *) (* let a = 42, print_c f = function 43 *)
-	| BiAnd(loc, binding1, binding2) -> print_binding f isRec binding1; evaluate:=true;print_binding f isRec binding2
+	| BiAnd(loc, binding1, binding2) -> 
+		print_binding f isRec binding1; 
+		evaluate:=true;
+		print_binding f isRec binding2
 	(* p = e *) (* let patt = expr *)
 	| BiEq(loc, patt1, expr1) -> 
 		let decreased = ref false in
-		if (!lastExpr = "StVal" || !lastExpr = "ExLet") then
-			lastExpr := !lastExpr^"Left";
+		let lastExp = ref "" in
+		  if (List.length !lastExpr)> 0 then
+				lastExp := List.hd !lastExpr;
+		if (!lastExp = "StVal" || !lastExp = "ExLet") then
+		begin
+			lastExp := !lastExp^"Left";
+			lastExpr := !lastExp::(List.tl !lastExpr)
+		end;
 		print_patt f patt1; 
-		if ((!lastExpr = "StValLeft" || !lastExpr = "ExLetLeft")) then
+		if ((!lastExp = "StValLeft" || !lastExp = "ExLetLeft")) then
 		begin
 			if (not(isRec) && !foundleft) then
 			begin
@@ -496,10 +525,12 @@ and print_binding f isRec = function (* The type of let bindings                
 				level := !level -1;
 				foundleft := false;
 			end;
-			if (!lastExpr = "ExLetLeft") then
-				lastExpr := "ExLetRight"
+			if (!lastExp = "ExLetLeft") then
+			begin
+				lastExpr := "ExLetRight"::(List.tl !lastExpr);
+			end
 			else
-				lastExpr := "StValRight";
+				lastExpr := "StValRight"::(List.tl !lastExpr);
 		end;
 		
 		print_expr f expr1;
@@ -594,7 +625,7 @@ and print_str_item f = function (* The type of structure items                  
 	| StTyp(loc, ctyp1) -> print_ctyp f ctyp1
 	(* value (rec)? bi *)
 	| StVal(loc, meta_bool1, binding1) -> 
-		lastExpr := "StVal";
+		lastExpr := "StVal"::!lastExpr;
 		if (!level > !maxlevel) then
 			maxlevel := !level;
 		(*level := !maxlevel;*)
@@ -603,7 +634,7 @@ and print_str_item f = function (* The type of structure items                  
 		(*level := !level - 1;*)
 		print_binding f (meta_bool1 = BTrue) binding1;
 		(*level := !level + 1;*)
-		lastExpr := "";
+		lastExpr := List.tl !lastExpr;
 		if (!evaluated) then
 			begin
 				evaluated := false
@@ -713,7 +744,7 @@ let print_ast_in_xml channel argument argument2=
   maxlevel := 0;
   lastvarlevel := 0;
 	lastvarlevelExLet := 0;
-  lastExpr := "";
+  lastExpr := [""];
   listvars := [];
 	varname := argument;
 	varloc := argument2;
@@ -724,30 +755,44 @@ let print_ast_in_xml channel argument argument2=
 				print_str_item Format.str_formatter parse_tree;
 			print_endline "<varocc>";
 			print_endline !varExpr;
+			print_endline !varModule;
 			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
 			begin
 				(* write all vars with the search level *)
 				let currlist = ref !listvars in
-					if (List.exists (fun x -> fst(x) = "ExLetLeft" && fst(snd(x)) = !varlevel) !listvars) then
-						currlist := (List.filter (fun x -> fst(x) <> "ExLetLeft" && fst(x) <> "ExLetRight") !listvars);
+					if (!varExpr = "StValLeft" && !varModule <> "") then
+					begin
+						currlist := (List.filter (fun x -> x.isInModule = !varModule && not(x.expr="StValLeft" && x.isInModule <> !varModule)) !currlist);
+					end
+					else
+						if (!varExpr = "StValRight" && !varModule <> "") then
+						begin
+							if (List.exists (fun x -> x.expr = "StValLeft" && x.isInModule = !varModule) !currlist) then
+								currlist := (List.filter (fun x -> x.isInModule = !varModule) !currlist);
+						end;
+					if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !currlist) then
+						currlist := (List.filter (fun x -> x.expr <> "ExLetLeft" && x.expr <> "ExLetRight") !currlist);
 			  	while((List.length !currlist)>0) do
 						let elem = (List.hd !currlist) in
-					  	let level = fst(snd(elem)) in
-							if ( level> 0 && level == !varlevel) then
-								print_endline (snd(snd(elem)));
+					  	let level = elem.level in
+							if (level> 0 && level == !varlevel) then
+							begin
+								print_string elem.xml;
+								print_endline elem.isInModule
+							end;
 						currlist := List.tl !currlist;
 					done;
 			end
 			else
 			begin
 				let currlist = ref !listvars in
-					if (List.exists (fun x -> fst(x) = "ExLetLeft" && fst(snd(x)) = !varlevel) !listvars) then
-						currlist := (List.filter (fun x -> fst(x) = "ExLetLeft" || fst(x) = "ExLetRight") !listvars);
+					if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !listvars) then
+						currlist := (List.filter (fun x -> x.expr = "ExLetLeft" || x.expr = "ExLetRight") !listvars);
 			  	while((List.length !currlist)>0) do
 						let elem = (List.hd !currlist) in
-							let level = fst(snd(elem)) in
+							let level = elem.level in
 								if ( level> 0 && level == !varlevel) then
-									print_endline (snd(snd(elem)));
+									print_endline elem.xml;
 								currlist := List.tl !currlist;
 					done;
 			end;
