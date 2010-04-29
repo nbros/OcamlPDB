@@ -750,6 +750,7 @@ let print_ast_in_xml channel argument argument2=
 	varname := argument;
 	varloc := argument2;
 	
+
 	match Deserializerp4.deserialize_chan channel with
 	| Some parse_tree ->
 			if (not(List.exists (fun x -> x = !varname) dontwant)) then
@@ -759,9 +760,24 @@ let print_ast_in_xml channel argument argument2=
 			print_endline !varModule;
 			let currlist = ref [] in
 			let templist = ref (List.rev !listvars) in
-			let hdl = ref (List.hd !templist) in
 			let found = ref false in
 			let isLocfound = ref false in
+			while (not(!found) || not(!isLocfound)) && (List.length !templist)>0 do
+				let hdl = (List.hd !templist) in
+				if (hdl.expr = "StValLeft" && hdl.level = !varlevel) then
+					found := true;
+				if (hdl.isLoc) then
+				begin
+					isLocfound := true;
+					(*found := true*)
+				end;
+				currlist := List.append !currlist (hdl::[]);
+				templist := List.tl !templist;
+			done;
+			if (List.length !currlist) > 0 then
+				currlist := List.rev !currlist
+			else
+				currlist := !listvars;
 			(*while (not(!found)) do
 				if (!hdl.expr = "StValLeft" && !hdl.level = !varlevel) then
 					found := true;
@@ -776,7 +792,7 @@ let print_ast_in_xml channel argument argument2=
 				currlist := List.rev !currlist
 			else
 				currlist := !listvars;*)
-				let currlist = ref !listvars in
+				(*let currlist = ref !listvars in*)
 			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
 			begin
 				(* write all vars with the search level *)
