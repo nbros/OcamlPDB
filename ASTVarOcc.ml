@@ -790,14 +790,11 @@ let print_ast_in_xml channel argument argument2=
 				
 			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
 			begin
-				(* write all vars with the search level *)
 				
 					if (!varExpr = "StValLeft") then
 					begin
 						if (!varModule <> "") then
 							currlist := (List.filter (fun x -> x.isInModule = !varModule && not(x.expr="StValLeft" && x.isInModule <> !varModule)) !currlist)
-						(*else
-							currlist := (List.filter (fun x -> x.isInModule = "") !currlist)*)
 					end
 					else
 						if (!varExpr = "StValRight") then
@@ -809,24 +806,9 @@ let print_ast_in_xml channel argument argument2=
 								if (List.exists(fun x -> x.isInModule = !varModule && x.expr = "StValLeft" && !varlevel = x.level) !currlist) then
 									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist
 							end
-							(*else*)
-								(*let templist = ref (List.rev !currlist) in
-								let hdl = ref (List.hd !templist) in
-								while (!hdl.expr <> "StValLeft" && !hdl.expr <> "") do
-									templist := !hdl ::(List.tl !templist);
-									hdl := (List.hd (List.tl !templist));
-								done;
-								if (List.length !templist) > 0 then
-									currlist := List.rev !templist;*)
-								
-				  (*currlist := List.filter (fun x -> x.letnumber = !varletnumber || x.expr = "StValLeft") !currlist;*)
-							(*if (List.exists (fun x -> x.expr = "StValLeft" && x.isInModule = !varModule) !currlist) then
-								currlist := (List.filter (fun x -> x.isInModule = !varModule) !currlist);
-							*)(*currlist := List.filter(fun x -> x.expr <> "ExLetLeft" (*&& x.expr <> "ExLetRight"*)) !currlist;
-						*)end;
-					(*if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !currlist) then
-						currlist := (List.filter (fun x -> x.expr <> "ExLetLeft" && x.expr <> "ExLetRight") !currlist);
-			  	*)while((List.length !currlist)>0) do
+					end;
+					
+					while((List.length !currlist)>0) do
 						let elem = (List.hd !currlist) in
 					  	let level = elem.level in
 							if (level> 0 && level == !varlevel) then
@@ -839,28 +821,24 @@ let print_ast_in_xml channel argument argument2=
 			end
 			else
 			begin
-					(*currlist := List.filter (fun x -> x.letnumber = !varletnumber || x.expr = "StValLeft") !currlist;
-					*)if (!varExpr = "ExLetLeft") then
-						begin
-						
-						(*currlist := List.filter (fun x -> x.isInModule = !varModule && (x.expr = "ExLetLeft" || x.expr = "ExLetRight")) !currlist;
-						*)end
-						else if (!varExpr = "ExLetRight") then
-						begin
-							if (List.exists(fun x -> x.expr = "ExLetLeft" && x.letnumber = !varletnumber && x.level = !varlevel) !currlist) then
-								currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
-						end;
-						if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "ExLetLeft" && !varlevel = x.level) !currlist) then
-							currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
-					(*if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !listvars) then
-						currlist := (List.filter (fun x -> x.expr = "ExLetLeft" || x.expr = "ExLetRight") !listvars);
-			  	*)while((List.length !currlist)>0) do
-						let elem = (List.hd !currlist) in
-							let level = elem.level in
-								if ( level> 0 && level == !varlevel) then
-									print_endline elem.xml;
+				if (!varExpr = "ExLetLeft") then
+				begin
+				end
+				else if (!varExpr = "ExLetRight") then
+				begin
+					if (List.exists(fun x -> x.expr = "ExLetLeft" && x.letnumber = !varletnumber && x.level = !varlevel) !currlist) then
+						currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
+				end;
+				if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "ExLetLeft" && !varlevel = x.level) !currlist) then
+					currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
+					
+				while((List.length !currlist)>0) do
+					let elem = (List.hd !currlist) in
+						let level = elem.level in
+							if ( level> 0 && level == !varlevel) then
+								print_endline elem.xml;
 								currlist := List.tl !currlist;
-					done;
+				done;
 			end;
 			print_string "</varocc>";
 			Format.flush_str_formatter ()
