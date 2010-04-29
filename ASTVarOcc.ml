@@ -28,7 +28,7 @@ let new_variable(e,x,l,iIM,iL) =
 let level = ref 0 (* Niveau *)
 let varname = ref "" (* Nom *)
 let varloc = ref "" (* Offsets *)
-let varlevel = ref 0 (* Niveau *)
+let varlevel = ref (-1) (* Niveau *)
 let varExpr = ref "" (*Expression *)
 let varModule = ref "" (* Module *)
 let varletnumber = ref 0 (* Numero du let *)
@@ -47,6 +47,9 @@ let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
 let string_of_loc loc =
 	(string_of_int (Loc.start_off loc)) ^ "," ^ (string_of_int (Loc.stop_off loc))
 
+let string_of_loc2 loc size =
+	let start = (Loc.start_off loc) in
+	(string_of_int start)^","^(string_of_int (start+size))
 let lt = (Str.regexp "<")
 let gt = (Str.regexp ">")
 let amp = (Str.regexp "&")
@@ -108,7 +111,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 								try
 									let isLoc = ref false in
 									let correctlevel = snd(List.find (fun x -> fst(x) = !modulename) !listmodule) in
-									if (!varloc = (string_of_loc loc)) then
+									if (!varloc = (string_of_loc loc) ) then
 									begin
 										isLoc := true;
 							 		  varlevel := correctlevel;
@@ -361,7 +364,11 @@ and print_expr f = function (* The type of expressions                          
 	(* assert e *) (** assert e *)
 	| ExAsr(loc, expr1) -> print_expr f expr1
 	(* e := e *) (** Assignment *)
-	| ExAss(loc, expr1, expr2) -> evaluate := false; varwrite := true; print_expr f expr1; print_expr f expr2
+	| ExAss(loc, expr1, expr2) -> 
+		evaluate := false; 
+		varwrite := true; 
+		print_expr f expr1; 
+		print_expr f expr2
 	(* 'c' *) (** Character *)
 	| ExChr(loc, name) -> ()
 	(* (e : t) or (e : t :> t) *) (** Coercion *)
@@ -718,7 +725,37 @@ and print_class_str_item f = function (* The type of class structure items      
 	(* method (private)? s : t = e or method (private)? s = e *)
 	| CrMth(loc, name, meta_bool1, expr1, ctyp1) -> print_expr f expr1; print_ctyp f ctyp1
 	(* value (mutable)? s = e *)
-	| CrVal(loc, name, meta_bool1, expr1) -> print_expr f expr1
+	| CrVal(loc, name, meta_bool1, expr1) -> 
+		let lastExp = List.hd !lastExpr in
+		if (name = !varname) then
+				begin
+					if (!evaluate) then
+					begin
+						level := !maxlevel + 1;
+						if (!level > !maxlevel) then
+							maxlevel := !level;
+						evaluate := false;
+						evaluated := true
+					end;
+					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
+						begin
+							let isLoc = ref false in
+							if (!varloc = (string_of_loc loc)) then
+							begin
+								isLoc := true;
+							  varlevel := !level;
+								varExpr := lastExp;
+								varModule := !modulename;
+								if (!varExpr = "StValLeft" || !varExpr <> "StValRight" || !varExpr = "ExLetLeft" || !varExpr <> "ExLetRight") then
+									varletnumber := !letnumber
+								else
+									varletnumber := 0;
+							end;
+							listvars := List.append !listvars (new_variable(lastExp,string,!level,!modulename,!isLoc)::[])	
+						end;
+					varwrite := false;
+				end;
+		print_expr f expr1
 	(* method virtual (private)? s : t *)
 	| CrVir(loc, name, meta_bool1, ctyp1) -> print_ctyp f ctyp1
 	(* value virtual (private)? s : t *)
@@ -746,7 +783,7 @@ let print_ast_in_xml channel argument argument2=
   varname := "";
 	varModule := "";
   varloc := "";
-  varlevel :=  0;
+  varlevel :=  (-1);
   evaluate := false;
   evaluated := false;
 	modulename := "";
@@ -766,6 +803,7 @@ let print_ast_in_xml channel argument argument2=
 			print_endline "<varocc>";
 			print_endline !varExpr;
 			print_endline !varModule;
+			print_endline (string_of_int !varlevel);
 			let currlist = ref [] in
 			let templist = ref (List.rev !listvars) in
 			let found = ref false in
@@ -840,7 +878,7 @@ let print_ast_in_xml channel argument argument2=
 				while((List.length !currlist)>0) do
 					let elem = (List.hd !currlist) in
 						let level = elem.level in
-							if ( level> 0 && level == !varlevel) then
+							if ( level>= 0 && level == !varlevel) then
 								print_endline elem.xml;
 								currlist := List.tl !currlist;
 				done;
