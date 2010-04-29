@@ -372,6 +372,7 @@ and print_expr f = function (* The type of expressions                          
 	| ExFun(loc, match_case1) -> 
 		if (!level > !maxlevel) then
 			maxlevel := !level;
+		maxlevel := !maxlevel + 1;
 		evaluate := true;
 		varwrite := false;
 		print_match_case f match_case1;
@@ -762,19 +763,25 @@ let print_ast_in_xml channel argument argument2=
 			let templist = ref (List.rev !listvars) in
 			let found = ref false in
 			let isLocfound = ref false in
-			while (not(!found) || not(!isLocfound)) && (List.length !templist)>0 do
+			while not(!isLocfound) && (List.length !templist)>0 do
 				let hdl = (List.hd !templist) in
-				if (hdl.expr = "StValLeft" && hdl.level = !varlevel) then
-					found := true;
 				if (hdl.isLoc) then
 				begin
 					isLocfound := true;
-					(*found := true*)
+					if (hdl.expr = "StValLeft") then
+						found := true;
 				end;
 				currlist := List.append !currlist (hdl::[]);
 				templist := List.tl !templist;
 			done;
-			if (List.length !currlist) > 0 then
+			while (not(!found) && (List.length !templist)>0)  do
+				let hdl = (List.hd !templist) in
+				if (hdl.expr = "StValLeft" && hdl.level = !varlevel && hdl.isInModule = !varModule) then
+					found := true;
+				currlist := List.append !currlist (hdl::[]);
+				templist := List.tl !templist;
+			done;
+			if !found then
 				currlist := List.rev !currlist
 			else
 				currlist := !listvars;
@@ -844,7 +851,6 @@ let print_ast_in_xml channel argument argument2=
 			end
 			else
 			begin
-				let currlist = ref !listvars in
 					(*currlist := List.filter (fun x -> x.letnumber = !varletnumber || x.expr = "StValLeft") !currlist;
 					*)if (!varExpr = "ExLetLeft") then
 						begin
