@@ -508,8 +508,10 @@ and print_binding f isRec = function (* The type of let bindings                
 	| BiNil(loc) -> ()
 	(* bi, bi *) (* let a = 42, print_c f = function 43 *)
 	| BiAnd(loc, binding1, binding2) -> 
+		let lastExp = List.hd !lastExpr in
 		print_binding f isRec binding1; 
 		evaluate:=true;
+		lastExpr := lastExp::(List.tl !lastExpr);
 		print_binding f isRec binding2
 	(* p = e *) (* let patt = expr *)
 	| BiEq(loc, patt1, expr1) -> 
@@ -785,21 +787,7 @@ let print_ast_in_xml channel argument argument2=
 				currlist := List.rev !currlist
 			else
 				currlist := !listvars;
-			(*while (not(!found)) do
-				if (!hdl.expr = "StValLeft" && !hdl.level = !varlevel) then
-					found := true;
-				if (!hdl.isLoc) then
-					isLocfound := true;
-				currlist := List.append !currlist (!hdl::[]);
-				hdl := (List.hd (List.tl !templist));
-				templist := List.tl !templist;
-				print_string "OK ";
-			done;
-			if (List.length !currlist) > 0 then
-				currlist := List.rev !currlist
-			else
-				currlist := !listvars;*)
-				(*let currlist = ref !listvars in*)
+				
 			if (!varExpr <> "ExLetLeft" && !varExpr <> "ExLetRight") then
 			begin
 				(* write all vars with the search level *)
@@ -856,7 +844,12 @@ let print_ast_in_xml channel argument argument2=
 						begin
 						
 						(*currlist := List.filter (fun x -> x.isInModule = !varModule && (x.expr = "ExLetLeft" || x.expr = "ExLetRight")) !currlist;
-						*)end;
+						*)end
+						else if (!varExpr = "ExLetRight") then
+						begin
+							if (List.exists(fun x -> x.expr = "ExLetLeft" && x.letnumber = !varletnumber && x.level = !varlevel) !currlist) then
+								currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
+						end;
 						if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "ExLetLeft" && !varlevel = x.level) !currlist) then
 							currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
 					(*if (List.exists (fun x -> x.expr = "ExLetLeft" && x.level = !varlevel) !listvars) then
