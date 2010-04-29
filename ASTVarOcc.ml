@@ -230,9 +230,12 @@ and print_ctyp f = function (* Representation of types                          
 	(* `s *) (** Polymorphic variant *)
 	| TyVrn(loc, name) -> ()
 	(* { t } *) (* { foo : int ; bar : mutable string } *) (** Record *)
-	| TyRec(loc, ctyp1) -> ()
+	| TyRec(loc, ctyp1) -> print_ctyp f ctyp1
 	(* t : t *) (** Field declaration *)
-	| TyCol(loc, ctyp1, ctyp2) -> ()
+	| TyCol(loc, ctyp1, ctyp2) -> 
+		evaluate := true;
+		print_ctyp f ctyp1;
+		print_ctyp f ctyp2;
 	(* t; t *) (** Semicolon-separated type list *)
 	| TySem(loc, ctyp1, ctyp2) -> print_ctyp f ctyp1; print_ctyp f ctyp2
 	(* t, t *) (** Comma-separated type list *)
@@ -320,7 +323,6 @@ and print_patt f = function (* The type of patterns                             
 	| PaStr(loc, name) -> ()
 	(* ( p ) *) (** Tuple *)
 	| PaTup(loc, patt1) -> 
-		(*lastExpr := "PaTup"::!lastExpr;*)
 		print_patt f patt1
 	(* (p : t) *) (** Type constraint *)
 	| PaTyc(loc, patt1, ctyp1) -> print_patt f patt1; print_ctyp f ctyp1
@@ -552,7 +554,10 @@ and print_rec_binding f = function (* The type of record definitions            
 	(* rb ; rb *)
 	| RbSem(loc, rec_binding1, rec_binding2) -> print_rec_binding f rec_binding1; print_rec_binding f rec_binding2
 	(* i = e *)
-	| RbEq(loc, ident1, expr1) -> print_ident f false ident1; print_expr f expr1
+	| RbEq(loc, ident1, expr1) -> 
+		varwrite := true;
+		print_ident f false ident1; 
+		print_expr f expr1
 	(* $s$ *)
 	| RbAnt(loc, name) -> ()
 and print_module_binding f = function (* The type of recursive module definitions                   *)
