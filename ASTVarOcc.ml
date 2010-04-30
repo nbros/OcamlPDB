@@ -6,24 +6,40 @@ let pp = Format.fprintf
 
 (* Initialise variable *)
 let letnumber = ref 0 (* Numero associe au let *)
+
 type variable = {
   expr: string; (*Type d'expression *)
   xml: string; (*flux xml a renvoyer *)
   level: int; (*Niveau de la variable *)
-	mutable isInModule: string; (*Indique si la variable se trouve dans un module *)
+	isInModule: string; (*Indique si la variable se trouve dans un module *)
+	isInClass: string;
 	letnumber: int; (* numero du let ou se trouve la variable *)
-	isLoc: bool (* Indique s'il s'agit de la variable selectionnee *)
+	isLoc: bool; (* Indique s'il s'agit de la variable selectionnee *)
 }
-let new_variable(e,x,l,iIM,iL) =
+
+let new_variable(e,x,l,iIM,iIC,iL) =
 	{
   expr = e;
   xml = x;
   level = l;
 	isInModule = iIM;
+	isInClass = iIC;
 	letnumber = !letnumber;
 	isLoc = iL;
   }
+	
+	
+type classinfo = {
+	nameC: string;
+	levelC: int;
+}
 
+let new_classinfo(n,l) =
+	{
+  nameC = n;
+  levelC = l;
+  }
+	
 (** Tout ce qui concerne la variable selectionnee *)
 let level = ref 0 (* Niveau *)
 let varname = ref "" (* Nom *)
@@ -31,17 +47,21 @@ let varloc = ref "" (* Offsets *)
 let varlevel = ref (-1) (* Niveau *)
 let varExpr = ref "" (*Expression *)
 let varModule = ref "" (* Module *)
+let varclass = ref "" (* Classe *)
 let varletnumber = ref 0 (* Numero du let *)
 let foundleft = ref false (* Indique s'il s'agit d'un nouveau let *)
 let varwrite = ref false (* Statut de la variable: lecture ou ecriture *)
 let evaluate = ref false (* Indique si l'on doit evaluer et donc incrémenter le niveau *)
 let evaluated = ref false (* Indique que l'evaluation a été faite *)
 let accessmodule = ref false (* Indique qu'il s'agit d'un acces dans un module *)
+let needclassname = ref false
 let modulename = ref "" (* Nom du module courant *)
+let classname = ref "" (* Nom de la classe courante *)
 let listmodule = ref [("", 0)]
+let listclass = ref [new_classinfo("",0)]
 let maxlevel = ref 0 (* var maxlevel *)
 let lastExpr = ref [""] (* last expression found *)
-let listvars = ref [new_variable("","",0,"",false)] (* list of all vars *)
+let listvars = ref [new_variable("","",0,"","",false)] (* list of all vars *)
 let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
 
 let string_of_loc loc =
@@ -92,14 +112,14 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						if (!level > !maxlevel) then
 							maxlevel := !level;
 						evaluate := false;
-						if ((List.length !lastExpr)> 0 && (List.hd !lastExpr) = "StValLeft") then
+						if (!lastExp = "StValLeft" || !lastExp = "ExLetLeft") then
 						begin
 							foundleft := true;
 						end
-						else
-						if ((List.length !lastExpr)> 0 && (List.hd !lastExpr) = "ExLetLeft") then
+						else if (!lastExp = "StCls") then
 						begin
-							foundleft := true;
+							listclass := List.append !listclass (new_classinfo(name, !level)::[]);
+							needclassname := false;
 						end;
 						evaluated := true
 					end;
@@ -122,7 +142,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 										else
 											varletnumber := 0;
 									end;
-										listvars := List.append !listvars (new_variable(!lastExp,string,correctlevel,!modulename,!isLoc)::[]);
+										listvars := List.append !listvars (new_variable(!lastExp,string,correctlevel,!modulename,!classname,!isLoc)::[]);
 								with
 									| Not_found -> ()
 							end;
@@ -142,7 +162,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 								else
 									varletnumber := 0;
 							end;
-							listvars := List.append !listvars (new_variable(!lastExp,string,!level,!modulename,!isLoc)::[])	
+							listvars := List.append !listvars (new_variable(!lastExp,string,!level,!modulename,!classname,!isLoc)::[])	
 						end;
 					varwrite := false;
 				end
@@ -187,7 +207,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 								modulename := name;
 						end
 						else
-							listvars := List.append !listvars (new_variable(!lastExp, string, !level, !modulename, !isLoc)::[]);
+							listvars := List.append !listvars (new_variable(!lastExp, string, !level, !modulename, !classname, !isLoc)::[]);
 					varwrite := false;
 				end
 				else if (isIdAcc) then
@@ -313,7 +333,7 @@ and print_patt f = function (* The type of patterns                             
 	(* ?s or ?s:(p) *) (** Optional label *)
 	| PaOlb(loc, name, patt1) -> print_patt f patt1
 	(* ?s:(p = e) or ?(p = e) *) (** Optional label with default value *)
-	| PaOlbi(loc, name, patt1, expr1) -> print_patt f patt1; print_expr f expr1
+	| PaOlbi(loc, name, patt1, expr1) -> print_patt f patt1; print_expr f  expr1
 	(* p | p *) (** Or *)
 	| PaOrp(loc, patt1, patt2) -> print_patt f patt1; print_patt f patt2
 	(* p .. p *) (** Pattern range *)
@@ -335,7 +355,7 @@ and print_patt f = function (* The type of patterns                             
 	| PaVrn(loc, name) -> ()
 	(* lazy p *)
 	| PaLaz(loc, patt1) -> print_patt f patt1
-and print_expr f = function (* The type of expressions                                    *)
+and print_expr f  = function (* The type of expressions                                    *)
 	(** Empty expression *)
 	| ExNil(loc) -> ()
 	(* i *) (**   Identifier *)
@@ -427,7 +447,7 @@ and print_expr f = function (* The type of expressions                          
 	(* new i *) (** New object *)
 	| ExNew(loc, ident1) -> print_ident f false ident1
 	(* object ((p))? (cst)? end *) (** Object declaration *)
-	| ExObj(loc, patt1, class_str_item1) -> print_patt f patt1; print_class_str_item f class_str_item1
+	| ExObj(loc, patt1, class_str_item1) -> print_patt f patt1; print_class_str_item f  class_str_item1
 	(* ?s or ?s:e *) (** Optional label *)
 	| ExOlb(loc, name, expr1) -> print_expr f expr1
 	(* {< rb >} *) (** Overloading *)
@@ -606,7 +626,11 @@ and print_module_expr f = function (* The type of module expressions            
 and print_str_item f = function (* The type of structure items                                *)
 	| StNil(loc) -> ()
 	(* class cice *)
-	| StCls(loc, class_expr1) -> print_class_expr f class_expr1
+	| StCls(loc, class_expr1) -> 
+		lastExpr := "StCls"::!lastExpr;
+		needclassname := true;
+		print_class_expr f class_expr1;
+		lastExpr := List.tl !lastExpr
 	(* class type cict *)
 	| StClt(loc, class_type1) -> print_class_type f class_type1
 	(* st ; st *)
@@ -695,31 +719,33 @@ and print_class_sig_item f = function (* The type of class signature items      
 and print_class_expr f = function (* The type of class expressions                              *)
 	| CeNil(loc) -> ()
 	(* ce e *)
-	| CeApp(loc, class_expr1, expr1) -> print_class_expr f class_expr1; print_expr f expr1
+	| CeApp(loc, class_expr1, expr1) -> print_class_expr f  class_expr1; print_expr f expr1
 	(* (virtual)? i ([ t ])? *)
-	| CeCon(loc, meta_bool1, ident1, ctyp1) -> print_ident f false ident1; print_ctyp f ctyp1
+	| CeCon(loc, meta_bool1, ident1, ctyp1) -> 
+		print_ident f false ident1; 
+		print_ctyp f ctyp1
 	(* fun p -> ce *)
-	| CeFun(loc, patt1, class_expr1) -> print_patt f patt1; print_class_expr f class_expr1
+	| CeFun(loc, patt1, class_expr1) -> print_patt f patt1; print_class_expr f  class_expr1
 	(* let (rec)? bi in ce *)
-	| CeLet(loc, meta_bool1, binding1, class_expr1) -> print_binding f (meta_bool1 = BTrue) binding1; print_class_expr f class_expr1
+	| CeLet(loc, meta_bool1, binding1, class_expr1) -> print_binding f (meta_bool1 = BTrue) binding1; print_class_expr f  class_expr1
 	(* object ((p))? (cst)? end *)
 	| CeStr(loc, patt1, class_str_item1) -> print_patt f patt1; print_class_str_item f class_str_item1
 	(* ce : ct *)
-	| CeTyc(loc, class_expr1, class_type1) -> print_class_expr f class_expr1; print_class_type f class_type1
+	| CeTyc(loc, class_expr1, class_type1) -> print_class_expr f  class_expr1; print_class_type f class_type1
 	(* ce, ce *)
-	| CeAnd(loc, class_expr1, class_expr2) -> print_class_expr f class_expr1; print_class_expr f class_expr2
+	| CeAnd(loc, class_expr1, class_expr2) -> print_class_expr f  class_expr1; print_class_expr f  class_expr2
 	(* ce = ce *)
-	| CeEq(loc, class_expr1, class_expr2) -> print_class_expr f class_expr1; print_class_expr f class_expr2
+	| CeEq(loc, class_expr1, class_expr2) -> print_class_expr f  class_expr1; print_class_expr f  class_expr2
 	(* $s$ *)
 	| CeAnt(loc, name) -> ()
-and print_class_str_item f = function (* The type of class structure items                          *)
+and print_class_str_item f  = function (* The type of class structure items                          *)
 	| CrNil(loc) -> ()
 	(* cst ; cst *)
 	| CrSem(loc, class_str_item1, class_str_item2) -> print_class_str_item f class_str_item1; print_class_str_item f class_str_item2;
 	(* type t = t *)
 	| CrCtr(loc, ctyp1, ctyp2) -> print_ctyp f ctyp1; print_ctyp f ctyp2
 	(* inherit ce or inherit ce as s *)
-	| CrInh(loc, class_expr1, name) -> print_class_expr f class_expr1
+	| CrInh(loc, class_expr1, name) -> print_class_expr f  class_expr1
 	(* initializer e *)
 	| CrIni(loc, expr1) -> print_expr f expr1
 	(* method (private)? s : t = e or method (private)? s = e *)
@@ -746,12 +772,14 @@ and print_class_str_item f = function (* The type of class structure items      
 							  varlevel := !level;
 								varExpr := lastExp;
 								varModule := !modulename;
+								if (lastExp = "StCls") then
+									varclass := "class";
 								if (!varExpr = "StValLeft" || !varExpr <> "StValRight" || !varExpr = "ExLetLeft" || !varExpr <> "ExLetRight") then
 									varletnumber := !letnumber
 								else
 									varletnumber := 0;
 							end;
-							listvars := List.append !listvars (new_variable(lastExp,string,!level,!modulename,!isLoc)::[])	
+							listvars := List.append !listvars (new_variable(lastExp,string,!level,!modulename,!classname,!isLoc)::[])	
 						end;
 					varwrite := false;
 				end;
@@ -782,13 +810,16 @@ let print_ast_in_xml channel argument argument2=
 	level := 0;
   varname := "";
 	varModule := "";
+	varclass := "";
   varloc := "";
   varlevel :=  (-1);
   evaluate := false;
   evaluated := false;
 	modulename := "";
 	accessmodule := false;
+	needclassname := false;
 	listmodule := [];
+	listclass := [];
   maxlevel := 0;
   lastExpr := [""];
   listvars := [];
@@ -801,19 +832,25 @@ let print_ast_in_xml channel argument argument2=
 			if (not(List.exists (fun x -> x = !varname) dontwant)) then
 				print_str_item Format.str_formatter parse_tree;
 			print_endline "<varocc>";
-			print_endline !varExpr;
-			print_endline !varModule;
-			print_endline (string_of_int !varlevel);
+			print_endline ("expr: "^(!varExpr));
+			print_endline ("mod: "^(!varModule));
+			print_endline ("level: "^(string_of_int !varlevel));
+			print_endline ("name: "^(!varname));
 			let currlist = ref [] in
 			let templist = ref (List.rev !listvars) in
 			let found = ref false in
 			let isLocfound = ref false in
+			let condition = 
+				if (!varclass <> "") then
+					"StCls"
+				else
+					"StValLeft" in
 			while not(!isLocfound) && (List.length !templist)>0 do
 				let hdl = (List.hd !templist) in
 				if (hdl.isLoc) then
 				begin
 					isLocfound := true;
-					if (hdl.expr = "StValLeft") then
+					if (hdl.expr = condition) then
 						found := true;
 				end;
 				currlist := List.append !currlist (hdl::[]);
