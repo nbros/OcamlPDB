@@ -39,7 +39,9 @@ let new_classinfo(n,l) =
   nameC = n;
   levelC = l;
   }
-	
+
+let lastDeclaration = ref (new_variable("","",-1,"","",false))
+
 (** Tout ce qui concerne la variable selectionnee *)
 let level = ref 0 (* Niveau *)
 let varname = ref "" (* Nom *)
@@ -112,10 +114,13 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						if (!level > !maxlevel) then
 							maxlevel := !level;
 						evaluate := false;
-						if (!lastExp = "StValLeft" || !lastExp = "ExLetLeft") then
+						if (!lastExp = "StValLeft") then
 						begin
+							lastDeclaration := new_variable(!lastExp,"",!level,!modulename,!classname,false);
 							foundleft := true;
 						end
+						else if (!lastExp = "ExLetLeft") then
+							foundleft := true
 						else if (!lastExp = "StCls") then
 						begin
 							listclass := List.append !listclass (new_classinfo(name, !level)::[]);
@@ -128,6 +133,27 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						evaluated := true
 					end;
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
+					if (!lastExp = "StValRight" && not(isIdAcc)) then
+					begin
+								let correctlevel = ref !level in
+										if not(List.exists(fun x -> (x.level = !level) || (x.expr = "McArr" && x.letnumber = !letnumber)) (List.rev !listvars)) then
+										begin	
+											 if (!lastDeclaration.level > -1 && !lastDeclaration.isInModule = !modulename && !lastDeclaration.isInClass = !classname && !lastDeclaration.letnumber< !letnumber) then
+											   correctlevel := !lastDeclaration.level;
+										end;
+										let isLoc = ref false in
+										if (!varloc = (string_of_loc loc) ) then
+										begin
+											isLoc := true;
+							  			varlevel := !correctlevel;
+											varExpr := !lastExp;
+											varModule := !modulename;
+											varClass := !classname;
+											varletnumber := !letnumber
+										end;
+										listvars := List.append !listvars (new_variable(!lastExp,string,!correctlevel,!modulename,!classname,!isLoc)::[]);
+						end
+						else
 						if (isIdAcc) then
 						begin
 							if (!accessmodule) then
@@ -416,7 +442,7 @@ and print_expr f  = function (* The type of expressions                         
 	| ExFun(loc, match_case1) -> 
 		if (!level > !maxlevel) then
 			maxlevel := !level;
-		maxlevel := !maxlevel + 1;
+		(*maxlevel := !maxlevel + 1;*)
 		evaluate := true;
 		varwrite := false;
 		print_match_case f match_case1;
@@ -619,7 +645,11 @@ and print_match_case f = function (* The type of cases for match/function/try co
 	(* a | a *)
 	| McOr(loc, match_case1, match_case2) -> print_match_case f match_case1; print_match_case f match_case2
 	(* p (when e)?) -> e *)
-	| McArr(loc, patt1, expr1, expr2) -> print_patt f patt1; print_expr f expr1; print_expr f expr2
+	| McArr(loc, patt1, expr1, expr2) -> 
+		lastExpr := "McArr"::!lastExpr;
+		print_patt f patt1;
+		lastExpr := List.tl !lastExpr; 
+		print_expr f expr1; print_expr f expr2
 	(* $s$ *)
 	| McAnt(loc, name) -> ()
 and print_module_expr f = function (* The type of module expressions                             *)
@@ -822,6 +852,7 @@ and print_option_ident f = function
 
 let print_ast_in_xml channel argument argument2=
 	
+	lastDeclaration := new_variable("","",-1,"","",false);
 	(* Initialize variables *)
 	level := 0;
   varname := "";
@@ -857,17 +888,17 @@ let print_ast_in_xml channel argument argument2=
 			let templist = ref (List.rev !listvars) in
 			let found = ref false in
 			let isLocfound = ref false in
-			let condition = 
+			(*let condition = 
 				if (!varClass <> "") then
 					"StCls"
 				else
-					"StValLeft" in
+					"StValLeft" in*)
 			while not(!isLocfound) && (List.length !templist)>0 do
 				let hdl = (List.hd !templist) in
 				if (hdl.isLoc) then
 				begin
 					isLocfound := true;
-					if (hdl.expr = condition) then
+					if ((hdl.expr = "McArr" && hdl.letnumber = !varletnumber) || hdl.expr = "StValLeft") then
 						found := true;
 				end;
 				currlist := List.append !currlist (hdl::[]);
@@ -875,7 +906,7 @@ let print_ast_in_xml channel argument argument2=
 			done;
 			while (not(!found) && (List.length !templist)>0)  do
 				let hdl = (List.hd !templist) in
-				if (hdl.expr = "StValLeft" && hdl.level = !varlevel && hdl.isInModule = !varModule) then
+				if ((hdl.expr = "McArr" && hdl.letnumber = !varletnumber) || hdl.expr = "StValLeft" && hdl.level = !varlevel && hdl.isInModule = !varModule) then
 					found := true;
 				currlist := List.append !currlist (hdl::[]);
 				templist := List.tl !templist;
