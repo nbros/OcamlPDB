@@ -106,6 +106,11 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 			let lastExp = ref "" in
 				if (List.length !lastExpr)> 0 then
 					lastExp := (List.hd !lastExpr);
+				if (!needclassname) then
+				begin
+					needclassname := false;
+					classname := name;
+				end;
 				if (name = !varname) then
 				begin
 					if (!evaluate) then
@@ -124,11 +129,6 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						else if (!lastExp = "StCls") then
 						begin
 							listclass := List.append !listclass (new_classinfo(name, !level)::[]);
-							if (!needclassname) then
-							begin
-								needclassname := false;
-								classname := name;
-							end;
 						end;
 						evaluated := true
 					end;
@@ -182,8 +182,9 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 							end
 							else
 							begin
-								if (List.exists (fun x -> x.nameC = name) !listclass) then
-									classname := name;
+								(*if (List.exists (fun x -> x.nameC = name) !listclass) then
+									classname := name;*)
+								(** IMPLEMENTER CLASSES ET STRUCT *)
 							end;
 						end
 						else
@@ -800,7 +801,7 @@ and print_class_str_item f  = function (* The type of class structure items     
 	(* value (mutable)? s = e *)
 	| CrVal(loc, name, meta_bool1, expr1) -> 
 		let lastExp = List.hd !lastExpr in
-		if (name = !varname) then
+		if (name = !varname) then (* Inutile? *)
 				begin
 					if (!evaluate) then
 					begin
@@ -809,7 +810,8 @@ and print_class_str_item f  = function (* The type of class structure items     
 							maxlevel := !level;
 						evaluate := false;
 						evaluated := true
-					end;
+					end;(* /Fin inutile *)
+					lastDeclaration := new_variable(lastExp,"",!level,!modulename,!classname,false);
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
 						begin
 							let isLoc = ref false in
