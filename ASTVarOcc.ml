@@ -12,12 +12,13 @@ type variable = {
   xml: string; (*flux xml a renvoyer *)
   level: int; (*Niveau de la variable *)
 	isInModule: string; (*Indique si la variable se trouve dans un module *)
+	isAccM: bool;
 	isInClass: string;
 	letnumber: int; (* numero du let ou se trouve la variable *)
 	isLoc: bool; (* Indique s'il s'agit de la variable selectionnee *)
 }
 
-let new_variable(e,x,l,iIM,iIC,iL) =
+let new_variable(e,x,l,iIM,iIC,iL,accM) =
 	{
   expr = e;
   xml = x;
@@ -26,6 +27,7 @@ let new_variable(e,x,l,iIM,iIC,iL) =
 	isInClass = iIC;
 	letnumber = !letnumber;
 	isLoc = iL;
+	isAccM = accM;
   }
 	
 	
@@ -40,7 +42,7 @@ let new_classinfo(n,l) =
   levelC = l;
   }
 
-let lastDeclaration = ref (new_variable("","",-1,"","",false))
+let lastDeclaration = ref (new_variable("","",-1,"","",false,false))
 
 (** Tout ce qui concerne la variable selectionnee *)
 let level = ref 0 (* Niveau *)
@@ -51,6 +53,7 @@ let varExpr = ref "" (*Expression *)
 let varModule = ref "" (* Module *)
 let varClass = ref "" (* Classe *)
 let varletnumber = ref 0 (* Numero du let *)
+let varIsAccM = ref false
 let foundleft = ref false (* Indique s'il s'agit d'un nouveau let *)
 let varwrite = ref false (* Statut de la variable: lecture ou ecriture *)
 let evaluate = ref false (* Indique si l'on doit evaluer et donc incrémenter le niveau *)
@@ -63,7 +66,7 @@ let listmodule = ref [("", 0)]
 let listclass = ref [new_classinfo("",0)]
 let maxlevel = ref 0 (* var maxlevel *)
 let lastExpr = ref [""] (* last expression found *)
-let listvars = ref [new_variable("","",0,"","",false)] (* list of all vars *)
+let listvars = ref [new_variable("","",0,"","",false,false)] (* list of all vars *)
 let dontwant = ["+";"-";"*";"/"] (* we don't allow opertor as varname *)
 
 let string_of_loc loc =
@@ -91,11 +94,14 @@ let escape_string str: string =
 let rec print_ident f isIdAcc = function (* The type of identifiers (including path like Foo(X).Bar.y) *)
 	(* i . i *) (** Access in module *)
 	| IdAcc(loc, ident1, ident2) -> 
-				print_ident f true ident1;
-				accessmodule := true;
-				print_ident f true ident2;
-				accessmodule := false;
-				modulename := "";
+		let modulebefore = !modulename in
+		print_ident f true ident1;
+		accessmodule := true;
+		print_ident f true ident2;
+		accessmodule := false;
+		(*if (not(List.exists (fun x -> x = "StMod") !lastExpr)) then
+			modulename := "";*)
+		modulename := modulebefore;
 	(* i i *) (** Application *)
 	| IdApp(loc, ident1, ident2) ->	print_ident f false ident1; print_ident f false ident2
 		
@@ -121,7 +127,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 						evaluate := false;
 						if (!lastExp = "StValLeft") then
 						begin
-							lastDeclaration := new_variable(!lastExp,"",!level,!modulename,!classname,false);
+							lastDeclaration := new_variable(!lastExp,"",!level,!modulename,!classname,false,false);
 							foundleft := true;
 						end
 						else if (!lastExp = "ExLetLeft") then
@@ -151,7 +157,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 											varClass := !classname;
 											varletnumber := !letnumber
 										end;
-										listvars := List.append !listvars (new_variable(!lastExp,string,!correctlevel,!modulename,!classname,!isLoc)::[]);
+										listvars := List.append !listvars (new_variable(!lastExp,string,!correctlevel,!modulename,!classname,!isLoc,false)::[]);
 						end
 						else
 						if (isIdAcc) then
@@ -169,15 +175,17 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 										varExpr := !lastExp;
 										varModule := !modulename;
 										varClass := !classname;
+										varIsAccM := true;
 										if (!varExpr = "StValLeft" || !varExpr <> "StValRight" || !varExpr = "ExLetLeft" || !varExpr <> "ExLetRight") then
 											varletnumber := !letnumber
 										else
 											varletnumber := 0;
 									end;
-										listvars := List.append !listvars (new_variable(!lastExp,string,correctlevel,!modulename,!classname,!isLoc)::[]);
+										listvars := List.append !listvars (new_variable(!lastExp,string,correctlevel,!modulename,!classname,!isLoc,true)::[]);
 								with
 									| Not_found -> ();
 								end;
+								if (not(List.exists (fun x -> x = "StMod") !lastExpr)) then
 								modulename := ""
 							end
 							else
@@ -202,7 +210,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 								else
 									varletnumber := 0;
 							end;
-							listvars := List.append !listvars (new_variable(!lastExp,string,!level,!modulename,!classname,!isLoc)::[]);
+							listvars := List.append !listvars (new_variable(!lastExp,string,!level,!modulename,!classname,!isLoc,false)::[]);
 							(*classname := "";*)
 						end;
 					varwrite := false;
@@ -249,7 +257,7 @@ let rec print_ident f isIdAcc = function (* The type of identifiers (including p
 								modulename := name;
 						end
 						else
-							listvars := List.append !listvars (new_variable(!lastExp, string, !level, !modulename, !classname, !isLoc)::[]);
+							listvars := List.append !listvars (new_variable(!lastExp, string, !level, !modulename, !classname, !isLoc, false)::[]);
 					varwrite := false;
 				end
 				else if (isIdAcc) then
@@ -595,7 +603,8 @@ and print_binding f isRec = function (* The type of let bindings                
 			lastExp := !lastExp^"Left";
 			lastExpr := !lastExp::(List.tl !lastExpr)
 		end;
-		print_patt f patt1; 
+		print_patt f patt1;
+		varwrite := false;
 		if ((!lastExp = "StValLeft" || !lastExp = "ExLetLeft")) then
 		begin
 			if (not(isRec) && !foundleft) then
@@ -700,11 +709,10 @@ and print_str_item f = function (* The type of structure items                  
 	(* module s = me *)
 	| StMod(loc, name, module_expr1) ->
 		let levelbefore = !level in
-		modulename := escape_string name;
-		let length_atPre = List.length !listvars in 
+		let namemodule = escape_string name in
+		modulename := namemodule;
 		print_module_expr f module_expr1;
-		if (List.length !listvars != length_atPre) then
-			listmodule := List.append !listmodule ((!modulename, !maxlevel)::[]);
+		listmodule := List.append !listmodule ((namemodule, !maxlevel)::[]);
 		maxlevel := levelbefore;
 		level := levelbefore;
 		modulename := ""
@@ -811,7 +819,7 @@ and print_class_str_item f  = function (* The type of class structure items     
 						evaluate := false;
 						evaluated := true
 					end;(* /Fin inutile *)
-					lastDeclaration := new_variable(lastExp,"",!level,!modulename,!classname,false);
+					lastDeclaration := new_variable(lastExp,"",!level,!modulename,!classname,false,false);
 					let string = "<var loc='"^(string_of_loc loc)^"' write='"^(string_of_bool !varwrite)^"'><name>"^(escape_string name)^"</name></var>" in
 						begin
 							let isLoc = ref false in
@@ -827,7 +835,7 @@ and print_class_str_item f  = function (* The type of class structure items     
 								else
 									varletnumber := 0;
 							end;
-							listvars := List.append !listvars (new_variable(lastExp,string,!level,!modulename,!classname,!isLoc)::[])	
+							listvars := List.append !listvars (new_variable(lastExp,string,!level,!modulename,!classname,!isLoc,false)::[])	
 						end;
 					varwrite := false;
 				end;
@@ -854,7 +862,7 @@ and print_option_ident f = function
 
 let print_ast_in_xml channel argument argument2=
 	
-	lastDeclaration := new_variable("","",-1,"","",false);
+	lastDeclaration := new_variable("","",-1,"","",false,false);
 	(* Initialize variables *)
 	level := 0;
   varname := "";
@@ -862,6 +870,7 @@ let print_ast_in_xml channel argument argument2=
 	varClass := "";
   varloc := "";
   varlevel :=  (-1);
+	varIsAccM := false;
   evaluate := false;
   evaluated := false;
 	modulename := "";
@@ -886,6 +895,7 @@ let print_ast_in_xml channel argument argument2=
 			print_endline ("level: "^(string_of_int !varlevel));
 			print_endline ("name: "^(!varname));
 			print_endline ("classname: "^(!varClass));
+			List.iter (fun x -> print_endline(fst(x))) !listmodule;
 			let currlist = ref [] in
 			let templist = ref (List.rev !listvars) in
 			let found = ref false in
@@ -934,8 +944,12 @@ let print_ast_in_xml channel argument argument2=
 								if (List.exists(fun x -> x.letnumber = !varletnumber && x.expr = "StValLeft" && !varlevel = x.level) !currlist) then
 									currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
 								if (List.exists(fun x -> x.isInModule = !varModule && x.expr = "StValLeft" && !varlevel = x.level) !currlist) then
-									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist
-							end
+									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist;
+								(*if (!varIsAccM) then
+									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist;*)
+							end;
+							
+							
 					end;
 					
 					while((List.length !currlist)>0) do

@@ -51,6 +51,31 @@ let cmd_print_ast_xml () =
 	print_endline (ASTToXML.print_ast_in_xml (parse_file filepath))
 ;;
 
+let cmd_print_declaration_xml () =
+	let filepath = read_line() in
+	print_endline (ASTDeclaration.print_declaration_in_xml (parse_file filepath))
+;;
+
+let cmd_print_declaration_xml_input () =
+	let strNLines = read_line() in
+	let nLines =
+		try
+			int_of_string (strNLines)
+		with Failure "int_of_string" ->
+				failwith ("Wrong input: expected number of lines, got '" ^ strNLines ^ "'")
+	in
+	let buffer = Buffer.create 10000 in
+	for i = 1 to nLines do
+		let line = read_line() in
+		Buffer.add_string buffer line;
+		Buffer.add_string buffer "\n"
+	done;
+	(match parse_input (Buffer.contents buffer) with
+		| Some channel -> print_endline (ASTDeclaration.print_declaration_in_xml (channel));
+		| None -> ());
+	print_eot ()
+;;
+
 let cmd_print_occvar_xml () =
 	let argument = read_line() in
 	  let argument2 = read_line() in
@@ -106,6 +131,8 @@ let commands = [
 	("exit", cmd_end);
 	("quit", cmd_end);
 	("print", cmd_print);
+	("astDeclarationFromFile", cmd_print_declaration_xml);
+	("astDeclarationFromInput", cmd_print_declaration_xml_input);
 	("astFromFile", cmd_print_ast_xml);
 	("astFromInput", cmd_print_ast_xml_input);
 	("astOccVarFromFile", cmd_print_occvar_xml);
