@@ -979,8 +979,8 @@ let print_ast_in_xml channel argument argument2=
 									currlist := List.filter(fun x -> x.letnumber = !varletnumber) !currlist;
 								if (List.exists(fun x -> x.isInModule = !varModule && x.expr = "StValLeft" && !varlevel = x.level) !currlist) then
 									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist;
-								(*if (!varIsAccM) then
-									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist;*)
+								if (!varIsAccM) then
+									currlist := List.filter(fun x -> x.isInModule = !varModule) !currlist;
 							end;	
 					end;
 					
