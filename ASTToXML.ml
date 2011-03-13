@@ -32,6 +32,43 @@ let print_meta_bool f = function
 	| BFalse -> pp f "false"
 	| BAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
 
+let print_rec_flag f = function
+	| ReRecursive -> pp f "rec"
+	| ReNil ->pp f "nil"
+	| ReAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+let print_direction_flag f = function
+	| DiTo -> pp f "to"
+	| DiDownto ->pp f "downto"
+	| DiAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+let print_mutable_flag f = function
+	| MuMutable -> pp f "mutable"
+	| MuNil ->pp f "nil"
+	| MuAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+let print_private_flag f = function
+	| PrPrivate -> pp f "private"
+	| PrNil ->pp f "nil"
+	| PrAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+let print_virtual_flag f = function
+	| ViVirtual -> pp f "virtual"
+	| ViNil ->pp f "nil"
+	| ViAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+let print_override_flag f = function
+	| OvOverride -> pp f "override"
+	| OvNil ->pp f "nil"
+	| OvAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+let print_row_var_flag f = function
+	| RvRowVar -> pp f "row_var"
+	| RvNil ->pp f "nil"
+	| RvAnt str -> pp f "<antiquotation>%s</antiquotation>" (escape_string str)
+
+
+
 let rec print_strings f = function
 	| LNil -> pp f ""
 	| LCons(str, r) -> pp f "<string>%s</string>%a" str print_strings r
@@ -71,7 +108,7 @@ and print_ctyp f = function (* Representation of types                          
 	(* type t 'a 'b 'c = t constraint t = t constraint t = t *) (** Type declaration *)
 	| TyDcl(loc, name, ctyps, ctyp1, (*TODO*) constraints) -> pp f "<TyDcl loc='%s'><name>%s</name><ctyps>%a</ctyps><ctyp>%a</ctyp><constraints>%a</constraints></TyDcl>" (string_of_loc loc) (escape_string name) print_ctyps ctyps print_ctyp ctyp1 print_constraints constraints
 	(* < (t)? (..)? > *) (* < move : int) -> 'a .. > as 'a  *) (**   Object type *)
-	| TyObj(loc, ctyp1, meta_bool1) -> pp f "<TyObj loc='%s'><ctyp>%a</ctyp><meta_bool>%a</meta_bool></TyObj>" (string_of_loc loc) print_ctyp ctyp1 print_meta_bool meta_bool1
+	| TyObj(loc, ctyp1, row_var_flag) -> pp f "<TyObj loc='%s'><ctyp>%a</ctyp><meta_bool>%a</meta_bool></TyObj>" (string_of_loc loc) print_ctyp ctyp1 print_row_var_flag row_var_flag
 	(* ?s:t *) (** Optional label type *)
 	| TyOlb(loc, name, ctyp1) -> pp f "<TyOlb loc='%s'><name>%s</name><ctyp>%a</ctyp></TyOlb>" (string_of_loc loc) (escape_string name) print_ctyp ctyp1
 	(* ! t . t *) (* ! 'a . list 'a) -> 'a *) (** Polymorphic type *)
@@ -120,6 +157,8 @@ and print_ctyp f = function (* Representation of types                          
 	| TyAmp(loc, ctyp1, ctyp2) -> pp f "<TyAmp loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></TyAmp>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
 	(* t of & t *)
 	| TyOfAmp(loc, ctyp1, ctyp2) -> pp f "<TyOfAmp loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></TyOfAmp>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
+	(* (module S)  (only on trunk for now) *)
+	| TyPkg (loc, module_type) -> pp f "<TyPkg loc='%s'><module_type>%a</module_type></TyPkg>" (string_of_loc loc) print_module_type module_type
 	(* $s$ *) (** Antiquotation *)
 	| TyAnt(loc, name) -> pp f "<TyAnt loc='%s'><name>%s</name></TyAnt>" (string_of_loc loc) (escape_string name)
 
@@ -180,6 +219,8 @@ and print_patt f = function (* The type of patterns                             
 	| PaVrn(loc, name) -> pp f "<PaVrn loc='%s'><name>%s</name></PaVrn>" (string_of_loc loc) (escape_string name)
 	(* lazy p *)
 	| PaLaz(loc, patt1) -> pp f "<PaLaz loc='%s'><patt>%a</patt></PaLaz>" (string_of_loc loc) print_patt patt1
+	(* (module M) (only on trunk) *)
+	(*| PaMod (loc, name) -> pp f "<PaMod loc='%s'><name>%s</name></PaMod>" (string_of_loc loc) (escape_string name) *)
 and print_expr f = function (* The type of expressions                                    *)
 	(** Empty expression *)
 	| ExNil(loc) -> pp f "<ExNil loc='%s'/>" (string_of_loc loc)
@@ -210,7 +251,7 @@ and print_expr f = function (* The type of expressions                          
 	(* 3.14 *) (** Float *)
 	| ExFlo(loc, name) -> pp f "<ExFlo loc='%s'><name>%s</name></ExFlo>" (string_of_loc loc) (escape_string name)
 	(* for s = e to/downto e do { e } *) (** For loop *)
-	| ExFor(loc, name, expr1, expr2, meta_bool1, expr3) -> pp f "<ExFor loc='%s'><name>%s</name><expr1>%a</expr1><expr2>%a</expr2><is_downto>%a</is_downto><expr3>%a</expr3></ExFor>" (string_of_loc loc) (escape_string name) print_expr expr1 print_expr expr2 print_meta_bool meta_bool1 print_expr expr3
+	| ExFor(loc, name, expr1, expr2, direction_flag, expr3) -> pp f "<ExFor loc='%s'><name>%s</name><expr1>%a</expr1><expr2>%a</expr2><is_downto>%a</is_downto><expr3>%a</expr3></ExFor>" (string_of_loc loc) (escape_string name) print_expr expr1 print_expr expr2 print_direction_flag direction_flag print_expr expr3
 	(* fun [ mc ] *) (** Function with match case *)
 	| ExFun(loc, match_case1) -> pp f "<ExFun loc='%s'><match_case>%a</match_case></ExFun>" (string_of_loc loc) print_match_case match_case1
 	(* if e then e else e *) (** if/then/else *)
@@ -228,7 +269,7 @@ and print_expr f = function (* The type of expressions                          
 	(* lazy e *) (** Lazy evaluation *)
 	| ExLaz(loc, expr1) -> pp f "<ExLaz loc='%s'><expr>%a</expr></ExLaz>" (string_of_loc loc) print_expr expr1
 	(* let b in e or let rec b in e *) (** Let statement with/without recursion *)
-	| ExLet(loc, meta_bool1, binding1, expr1) -> pp f "<ExLet loc='%s'><rec>%a</rec><binding>%a</binding><expr>%a</expr></ExLet>" (string_of_loc loc) print_meta_bool meta_bool1 print_binding binding1 print_expr expr1
+	| ExLet(loc, rec_flag, binding1, expr1) -> pp f "<ExLet loc='%s'><rec>%a</rec><binding>%a</binding><expr>%a</expr></ExLet>" (string_of_loc loc) print_rec_flag rec_flag print_binding binding1 print_expr expr1
 	(* let module s = me in e *) (** "Let module in" construct *)
 	| ExLmd(loc, name, module_expr1, expr1) -> pp f "<ExLmd loc='%s'><name>%s</name><module_expr>%a</module_expr><expr>%a</expr></ExLmd>" (string_of_loc loc) (escape_string name) print_module_expr module_expr1 print_expr expr1
 	(* match e with [ mc ] *) (** Match case *)
@@ -263,6 +304,13 @@ and print_expr f = function (* The type of expressions                          
 	| ExVrn(loc, name) -> pp f "<ExVrn loc='%s'><name>%s</name></ExVrn>" (string_of_loc loc) (escape_string name)
 	(* while e do { e } *) (** "While .. do" constraint *)
 	| ExWhi(loc, expr1, expr2) -> pp f "<ExWhi loc='%s'><expr1>%a</expr1><expr2>%a</expr2></ExWhi>" (string_of_loc loc) print_expr expr1 print_expr expr2
+		(* let open i in e *)
+	| ExOpI (loc, ident, expr) -> pp f "<ExOpI loc='%s'><ident>%a</ident><expr>%a</expr></ExOpI>" (string_of_loc loc) print_ident ident print_expr expr
+		(* fun (type t) -> e *)
+		(* let f x (type t) y z = e *)
+	| ExFUN (loc, name, expr) -> pp f "<ExFUN loc='%s'><name>%s</name><expr>%a</expr></ExFUN>" (string_of_loc loc) (escape_string name) print_expr expr
+		(* (module ME : S) which is represented as (module (ME : S)) *)
+	| ExPkg (loc, module_expr) -> pp f "<ExPkg loc='%s'><module_expr>%a</module_expr></ExPkg>" (string_of_loc loc) print_module_expr module_expr
 and print_module_type f = function (* The type of module types                                   *)
 	| MtNil(loc) -> pp f "<MtNil loc='%s'></MtNil>" (string_of_loc loc)
 	(* i *) (* A.B.C *)
@@ -313,6 +361,10 @@ and print_with_constr f = function (* The type of `with' constraints            
 	| WcTyp(loc, ctyp1, ctyp2) -> pp f "<WcTyp loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></WcTyp>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
 	(* module i = i *)
 	| WcMod(loc, ident1, ident2) -> pp f "<WcMod loc='%s'><ident1>%a</ident1><ident2>%a</ident2></WcMod>" (string_of_loc loc) print_ident ident1 print_ident ident2
+	(* type t := t *)
+	| WcTyS (loc, ctyp1, ctyp2) -> pp f "<WcTyS loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></WcTyS>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
+	(* module i := i *)
+	| WcMoS (loc, ident1, ident2) -> pp f "<WcMoS loc='%s'><ident1>%a</ident1><ident2>%a</ident2></WcMoS>" (string_of_loc loc) print_ident ident1 print_ident ident2
 	(* wc, wc *)
 	| WcAnd(loc, with_constr1, with_constr2) -> pp f "<WcAnd loc='%s'><with_constr1>%a</with_constr1><with_constr2>%a</with_constr2></WcAnd>" (string_of_loc loc) print_with_constr with_constr1 print_with_constr with_constr2
 	(* $s$ *)
@@ -367,6 +419,9 @@ and print_module_expr f = function (* The type of module expressions            
 	| MeStr(loc, str_item1) -> pp f "<MeStr loc='%s'><str_item>%a</str_item></MeStr>" (string_of_loc loc) print_str_item str_item1
 	(* (me : mt) *)
 	| MeTyc(loc, module_expr1, module_type1) -> pp f "<MeTyc loc='%s'><module_expr1>%a</module_expr1><module_type1>%a</module_type1></MeTyc>" (string_of_loc loc) print_module_expr module_expr1 print_module_type module_type1
+	(* (value e) *)
+	(* (value e : S) which is represented as (value (e : S)) *)
+	| MePkg (loc, expr) -> pp f "<MePkg loc='%s'><expr>%a</expr></MePkg>" (string_of_loc loc) print_expr expr
 	(* $s$ *)
 	| MeAnt(loc, name) -> pp f "<MeAnt loc='%s'><name>%s</name></MeAnt>" (string_of_loc loc) (escape_string name)
 
@@ -399,13 +454,13 @@ and print_str_item f = function (* The type of structure items                  
 	(* type t *)
 	| StTyp(loc, ctyp1) -> pp f "<StTyp loc='%s'><ctyp>%a</ctyp></StTyp>" (string_of_loc loc) print_ctyp ctyp1
 	(* value (rec)? bi *)
-	| StVal(loc, meta_bool1, binding1) -> pp f "<StVal loc='%s'><rec>%a</rec><binding>%a</binding></StVal>" (string_of_loc loc) print_meta_bool meta_bool1 print_binding binding1
+	| StVal(loc, rec_flag, binding1) -> pp f "<StVal loc='%s'><rec>%a</rec><binding>%a</binding></StVal>" (string_of_loc loc) print_rec_flag rec_flag print_binding binding1
 	(* $s$ *)
 	| StAnt(loc, name) -> pp f "<StAnt loc='%s'><name>%s</name></StAnt>" (string_of_loc loc) (escape_string name)
 and print_class_type f = function (* The type of class types                                    *)
 	| CtNil(loc) -> pp f "<CtNil loc='%s'/>" (string_of_loc loc)
 	(* (virtual)? i ([ t ])? *)
-	| CtCon(loc, meta_bool1, ident1, ctyp1) -> pp f "<CtCon loc='%s'><is_virtual>%a</is_virtual><ident>%a</ident><ctyp>%a</ctyp></CtCon>" (string_of_loc loc) print_meta_bool meta_bool1 print_ident ident1 print_ctyp ctyp1
+	| CtCon(loc, virtual_flag, ident1, ctyp1) -> pp f "<CtCon loc='%s'><is_virtual>%a</is_virtual><ident>%a</ident><ctyp>%a</ctyp></CtCon>" (string_of_loc loc) print_virtual_flag virtual_flag print_ident ident1 print_ctyp ctyp1
 	(* [t]) -> ct *)
 	| CtFun(loc, ctyp1, class_type1) -> pp f "<CtFun loc='%s'><ctyp>%a</ctyp><class_type>%a</class_type></CtFun>" (string_of_loc loc) print_ctyp ctyp1 print_class_type class_type1
 	(* object ((t))? (csg)? end *)
@@ -427,11 +482,11 @@ and print_class_sig_item f = function (* The type of class signature items      
 	(* inherit ct *)
 	| CgInh(loc, class_type1) -> pp f "<CgInh loc='%s'><class_type>%a</class_type></CgInh>" (string_of_loc loc) print_class_type class_type1
 	(* method s : t or method private s : t *)
-	| CgMth(loc, name, meta_bool1, ctyp1) -> pp f "<CgMth loc='%s'><name>%s</name><is_private>%a</is_private><ctyp>%a</ctyp></CgMth>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_ctyp ctyp1
+	| CgMth(loc, name, private_flag, ctyp1) -> pp f "<CgMth loc='%s'><name>%s</name><is_private>%a</is_private><ctyp>%a</ctyp></CgMth>" (string_of_loc loc) (escape_string name) print_private_flag private_flag print_ctyp ctyp1
 	(* value (virtual)? (mutable)? s : t *)
-	| CgVal(loc, name, meta_bool1, meta_bool2, ctyp1) -> pp f "<CgVal loc='%s'><name>%s</name><is_virtual>%a</is_virtual><is_mutable>%a</is_mutable><ctyp>%a</ctyp></CgVal>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_meta_bool meta_bool2 print_ctyp ctyp1
-	(* method virtual (mutable)? s : t *)
-	| CgVir(loc, name, meta_bool1, ctyp1) -> pp f "<CgVir loc='%s'><name>%s</name><is_mutable>%a</is_mutable><ctyp>%a</ctyp></CgVir>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_ctyp ctyp1
+	| CgVal(loc, name, mutable_flag, virtual_flag, ctyp1) -> pp f "<CgVal loc='%s'><name>%s</name><is_mutable>%a</is_mutable><is_virtual>%a</is_virtual><ctyp>%a</ctyp></CgVal>" (string_of_loc loc) (escape_string name) print_mutable_flag mutable_flag print_virtual_flag virtual_flag print_ctyp ctyp1
+	(* method virtual (private)? s : t *)
+	| CgVir(loc, name, private_flag, ctyp1) -> pp f "<CgVir loc='%s'><name>%s</name><is_private>%a</is_private><ctyp>%a</ctyp></CgVir>" (string_of_loc loc) (escape_string name) print_private_flag private_flag print_ctyp ctyp1
 	(* $s$ *)
 	| CgAnt(loc, name) -> pp f "<CgAnt loc='%s'><name>%s</name></CgAnt>" (string_of_loc loc) (escape_string name)
 and print_class_expr f = function (* The type of class expressions                              *)
@@ -439,11 +494,11 @@ and print_class_expr f = function (* The type of class expressions              
 	(* ce e *)
 	| CeApp(loc, class_expr1, expr1) -> pp f "<CeApp loc='%s'><class_expr>%a</class_expr><expr>%a</expr></CeApp>" (string_of_loc loc) print_class_expr class_expr1 print_expr expr1
 	(* (virtual)? i ([ t ])? *)
-	| CeCon(loc, meta_bool1, ident1, ctyp1) -> pp f "<CeCon loc='%s'><is_virtual>%a</is_virtual><ident>%a</ident><ctyp>%a</ctyp></CeCon>" (string_of_loc loc) print_meta_bool meta_bool1 print_ident ident1 print_ctyp ctyp1
+	| CeCon(loc, virtual_flag, ident1, ctyp1) -> pp f "<CeCon loc='%s'><is_virtual>%a</is_virtual><ident>%a</ident><ctyp>%a</ctyp></CeCon>" (string_of_loc loc) print_virtual_flag virtual_flag print_ident ident1 print_ctyp ctyp1
 	(* fun p -> ce *)
 	| CeFun(loc, patt1, class_expr1) -> pp f "<CeFun loc='%s'><patt>%a</patt><class_expr>%a</class_expr></CeFun>" (string_of_loc loc) print_patt patt1 print_class_expr class_expr1
 	(* let (rec)? bi in ce *)
-	| CeLet(loc, meta_bool1, binding1, class_expr1) -> pp f "<CeLet loc='%s'><rec>%a</rec><binding>%a</binding><class_expr>%a</class_expr></CeLet>" (string_of_loc loc) print_meta_bool meta_bool1 print_binding binding1 print_class_expr class_expr1
+	| CeLet(loc, rec_flag, binding1, class_expr1) -> pp f "<CeLet loc='%s'><rec>%a</rec><binding>%a</binding><class_expr>%a</class_expr></CeLet>" (string_of_loc loc) print_rec_flag rec_flag print_binding binding1 print_class_expr class_expr1
 	(* object ((p))? (cst)? end *)
 	| CeStr(loc, patt1, class_str_item1) -> pp f "<CeStr loc='%s'><patt>%a</patt><class_str_item>%a</class_str_item></CeStr>" (string_of_loc loc) print_patt patt1 print_class_str_item class_str_item1
 	(* ce : ct *)
@@ -460,18 +515,18 @@ and print_class_str_item f = function (* The type of class structure items      
 	| CrSem(loc, class_str_item1, class_str_item2) -> pp f "<CrSem loc='%s'><class_str_item1>%a</class_str_item1><class_str_item2>%a</class_str_item2></CrSem>" (string_of_loc loc) print_class_str_item class_str_item1 print_class_str_item class_str_item2
 	(* type t = t *)
 	| CrCtr(loc, ctyp1, ctyp2) -> pp f "<CrCtr loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></CrCtr>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
-	(* inherit ce or inherit ce as s *)
-	| CrInh(loc, class_expr1, name) -> pp f "<CrInh loc='%s'><class_expr>%a</class_expr><name>%s</name></CrInh>" (string_of_loc loc) print_class_expr class_expr1 (escape_string name)
+	(* inherit(!)? ce (as s)? *)
+	| CrInh(loc, override_flag, class_expr1, name) -> pp f "<CrInh loc='%s'><override>%a</override><class_expr>%a</class_expr><name>%s</name></CrInh>" (string_of_loc loc) print_override_flag override_flag print_class_expr class_expr1 (escape_string name)
 	(* initializer e *)
 	| CrIni(loc, expr1) -> pp f "<CrIni loc='%s'><expr>%a</expr></CrIni>" (string_of_loc loc) print_expr expr1
-	(* method (private)? s : t = e or method (private)? s = e *)
-	| CrMth(loc, name, meta_bool1, expr1, ctyp1) -> pp f "<CrMth loc='%s'><name>%s</name><is_private>%a</is_private><expr>%a</expr><ctyp>%a</ctyp></CrMth>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_expr expr1 print_ctyp ctyp1
-	(* value (mutable)? s = e *)
-	| CrVal(loc, name, meta_bool1, expr1) -> pp f "<CrVal loc='%s'><name>%s</name><is_mutable>%a</is_mutable><expr>%a</expr></CrVal>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_expr expr1
+	(* method(!)? (private)? s : t = e or method(!)? (private)? s = e *)
+	| CrMth(loc, name, override_flag, private_flag, expr1, ctyp1) -> pp f "<CrMth loc='%s'><name>%s</name><override>%a</override><is_private>%a</is_private><expr>%a</expr><ctyp>%a</ctyp></CrMth>" (string_of_loc loc) (escape_string name) print_override_flag override_flag print_private_flag private_flag print_expr expr1 print_ctyp ctyp1
+	(* value(!)? (mutable)? s = e *)
+	| CrVal(loc, name, override_flag, mutable_flag, expr1) -> pp f "<CrVal loc='%s'><name>%s</name><override>%a</override><is_mutable>%a</is_mutable><expr>%a</expr></CrVal>" (string_of_loc loc) (escape_string name) print_override_flag override_flag print_mutable_flag mutable_flag print_expr expr1
 	(* method virtual (private)? s : t *)
-	| CrVir(loc, name, meta_bool1, ctyp1) -> pp f "<CrVir loc='%s'><name>%s</name><is_private>%a</is_private><ctyp>%a</ctyp></CrVir>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_ctyp ctyp1
-	(* value virtual (private)? s : t *)
-	| CrVvr(loc, name, meta_bool1, ctyp1) -> pp f "<CrVvr loc='%s'><name>%s</name><is_private>%a</is_private><ctyp>%a</ctyp></CrVvr>" (string_of_loc loc) (escape_string name) print_meta_bool meta_bool1 print_ctyp ctyp1
+	| CrVir(loc, name, private_flag, ctyp1) -> pp f "<CrVir loc='%s'><name>%s</name><is_private>%a</is_private><ctyp>%a</ctyp></CrVir>" (string_of_loc loc) (escape_string name) print_private_flag private_flag print_ctyp ctyp1
+	(* value virtual (mutable)? s : t *)
+	| CrVvr(loc, name, mutable_flag, ctyp1) -> pp f "<CrVvr loc='%s'><name>%s</name><is_mutable>%a</is_mutable><ctyp>%a</ctyp></CrVvr>" (string_of_loc loc) (escape_string name) print_mutable_flag mutable_flag print_ctyp ctyp1
 	(* $s$ *)
 	| CrAnt(loc, name) -> pp f "<CrAnt loc='%s'><name>%s</name></CrAnt>" (string_of_loc loc) (escape_string name)
 

@@ -4,6 +4,34 @@
     [ BTrue
     | BFalse
     | BAnt of string ]
+   and rec_flag =
+    [ ReRecursive
+    | ReNil
+    | ReAnt of string ]
+   and direction_flag =
+    [ DiTo
+    | DiDownto
+    | DiAnt of string ]
+   and mutable_flag =
+    [ MuMutable
+    | MuNil
+    | MuAnt of string ]
+   and private_flag =
+    [ PrPrivate
+    | PrNil
+    | PrAnt of string ]
+   and virtual_flag =
+    [ ViVirtual
+    | ViNil
+    | ViAnt of string ]
+   and override_flag =
+    [ OvOverride
+    | OvNil
+    | OvAnt of string ]
+   and row_var_flag =
+    [ RvRowVar
+    | RvNil
+    | RvAnt of string ]
    and meta_option 'a =
     [ ONone
     | OSome of 'a
@@ -29,7 +57,7 @@
     | TyId  of loc and ident (* i *) (* Lazy.t *) (** Type identifier *)
     | TyMan of loc and ctyp and ctyp (* t == t *) (* type t = [ A | B ] == Foo.t *) (** Type manifest *)
     | TyDcl of loc and string and list ctyp and ctyp and list (ctyp * ctyp) (* type t 'a 'b 'c = t constraint t = t constraint t = t *) (** Type declaration *)
-    | TyObj of loc and ctyp and meta_bool (* < (t)? (..)? > *) (* < move : int -> 'a .. > as 'a  *) (**   Object type *)
+    | TyObj of loc and ctyp and row_var_flag (* < (t)? (..)? > *) (* < move : int -> 'a .. > as 'a  *) (**   Object type *)
     | TyOlb of loc and string and ctyp (* ?s:t *) (** Optional label type *)
     | TyPol of loc and ctyp and ctyp (* ! t . t *) (* ! 'a . list 'a -> 'a *) (** Polymorphic type *)
     | TyQuo of loc and string (* 's *)
@@ -54,6 +82,7 @@
     | TyVrnInfSup of loc and ctyp and ctyp (* [ < t > t ] *)
     | TyAmp of loc and ctyp and ctyp (* t & t *)
     | TyOfAmp of loc and ctyp and ctyp (* t of & t *)
+    | TyPkg of loc and module_type (* (module S) (only on trunk) *)
     | TyAnt of loc and string (* $s$ *) (** Antiquotation *)
     ]
    and patt = (* The type of patterns                                       *)
@@ -84,7 +113,8 @@
     | PaTyc of loc and patt and ctyp (* (p : t) *) (** Type constraint *)
     | PaTyp of loc and ident (* #i *)
     | PaVrn of loc and string (* `s *) (** Polymorphic variant *)
-    | PaLaz of loc and patt (* lazy p *) ]
+    | PaLaz of loc and patt (* lazy p *)
+    | PaMod of loc and string (* (module M) *) ]
   and expr = (* The type of expressions                                    *)
     [ ExNil of loc (** Empty expression *)
     | ExId  of loc and ident (* i *) (**   Identifier *)
@@ -100,7 +130,7 @@
     | ExChr of loc and string (* 'c' *) (** Character *)
     | ExCoe of loc and expr and ctyp and ctyp (* (e : t) or (e : t :> t) *) (** Coercion *)
     | ExFlo of loc and string (* 3.14 *) (** Float *)
-    | ExFor of loc and string and expr and expr and meta_bool and expr (* for s = e to/downto e do { e } *) (** For loop *)
+    | ExFor of loc and string and expr and expr and direction_flag and expr (* for s = e to/downto e do { e } *) (** For loop *)
     | ExFun of loc and match_case (* fun [ mc ] *) (** Function with match case *)
     | ExIfe of loc and expr and expr and expr (* if e then e else e *) (** if/then/else *)
     | ExInt of loc and string (* 42 *) (** Int *)
@@ -109,7 +139,7 @@
     | ExNativeInt of loc and string (** NativeInt *)
     | ExLab of loc and string and expr (* ~s or ~s:e *) (** Label argument with/without expression *)
     | ExLaz of loc and expr (* lazy e *) (** Lazy evaluation *)
-    | ExLet of loc and meta_bool and binding and expr (* let b in e or let rec b in e *) (** Let statement with/without recursion *)
+    | ExLet of loc and rec_flag and binding and expr (* let b in e or let rec b in e *) (** Let statement with/without recursion *)
     | ExLmd of loc and string and module_expr and expr (* let module s = me in e *) (** "Let module in" construct *)
     | ExMat of loc and expr and match_case (* match e with [ mc ] *) (** Match case *)
     | ExNew of loc and ident (* new i *) (** New object *)
@@ -126,7 +156,10 @@
     | ExCom of loc and expr and expr (* e, e *) (** Comma-separated expression list *)
     | ExTyc of loc and expr and ctyp (* (e : t) *) (** Type constraint *)
     | ExVrn of loc and string (* `s *) (** Polymorphic variant *)
-    | ExWhi of loc and expr and expr (* while e do { e } *) (** "While .. do" constraint *) ]
+    | ExWhi of loc and expr and expr (* while e do { e } *) (** "While .. do" constraint *)
+    | ExOpI of loc and ident and expr (* let open i in e *)
+    | ExFUN of loc and string and expr (* fun (type t) -> e *) (* let f x (type t) y z = e *)
+    | ExPkg of loc and module_expr (* (module ME : S) which is represented as (module (ME : S)) *) ]
   and module_type = (* The type of module types                                   *)
     [ MtNil of loc
     | MtId  of loc and ident (* i *) (* A.B.C *)
@@ -155,6 +188,8 @@
     [ WcNil of loc
     | WcTyp of loc and ctyp and ctyp (* type t = t *)
     | WcMod of loc and ident and ident (* module i = i *)
+    | WcTyS of loc and ctyp and ctyp (* type t := t *)
+    | WcMoS of loc and ident and ident (* module i := i *)
     | WcAnd of loc and with_constr and with_constr (* wc and wc *)
     | WcAnt of loc and string (* $s$ *) ]
   and binding = (* The type of let bindings                                   *)
@@ -185,6 +220,7 @@
     | MeFun of loc and string and module_type and module_expr (* functor (s : mt) -> me *)
     | MeStr of loc and str_item (* struct st end *)
     | MeTyc of loc and module_expr and module_type (* (me : mt) *)
+		| MePkg of loc and expr (* (value e) *) (* (value e : S) which is represented as (value (e : S)) *)
     | MeAnt of loc and string (* $s$ *) ]
   and str_item = (* The type of structure items                                *)
     [ StNil of loc
@@ -201,11 +237,11 @@
     | StMty of loc and string and module_type (* module type s = mt *)
     | StOpn of loc and ident (* open i *)
     | StTyp of loc and ctyp (* type t *)
-    | StVal of loc and meta_bool and binding (* value (rec)? bi *)
+    | StVal of loc and rec_flag and binding (* value (rec)? bi *)
     | StAnt of loc and string (* $s$ *) ]
   and class_type = (* The type of class types                                    *)
     [ CtNil of loc
-    | CtCon of loc and meta_bool and ident and ctyp (* (virtual)? i ([ t ])? *)
+    | CtCon of loc and virtual_flag and ident and ctyp (* (virtual)? i ([ t ])? *)
     | CtFun of loc and ctyp and class_type (* [t] -> ct *)
     | CtSig of loc and ctyp and class_sig_item (* object ((t))? (csg)? end *)
     | CtAnd of loc and class_type and class_type (* ct and ct *)
@@ -217,16 +253,16 @@
     | CgCtr of loc and ctyp and ctyp (* type t = t *)
     | CgSem of loc and class_sig_item and class_sig_item (* csg ; csg *)
     | CgInh of loc and class_type (* inherit ct *)
-    | CgMth of loc and string and meta_bool and ctyp (* method s : t or method private s : t *)
-    | CgVal of loc and string and meta_bool and meta_bool and ctyp (* value (virtual)? (mutable)? s : t *)
-    | CgVir of loc and string and meta_bool and ctyp (* method virtual (mutable)? s : t *)
+    | CgMth of loc and string and private_flag and ctyp (* method s : t or method private s : t *)
+    | CgVal of loc and string and mutable_flag and virtual_flag and ctyp (* value (virtual)? (mutable)? s : t *)
+    | CgVir of loc and string and private_flag and ctyp (* method virtual (private)? s : t *)
     | CgAnt of loc and string (* $s$ *) ]
   and class_expr = (* The type of class expressions                              *)
     [ CeNil of loc
     | CeApp of loc and class_expr and expr (* ce e *)
-    | CeCon of loc and meta_bool and ident and ctyp (* (virtual)? i ([ t ])? *)
+    | CeCon of loc and virtual_flag and ident and ctyp (* (virtual)? i ([ t ])? *)
     | CeFun of loc and patt and class_expr (* fun p -> ce *)
-    | CeLet of loc and meta_bool and binding and class_expr (* let (rec)? bi in ce *)
+    | CeLet of loc and rec_flag and binding and class_expr (* let (rec)? bi in ce *)
     | CeStr of loc and patt and class_str_item (* object ((p))? (cst)? end *)
     | CeTyc of loc and class_expr and class_type (* ce : ct *)
     | CeAnd of loc and class_expr and class_expr (* ce and ce *)
@@ -236,10 +272,10 @@
     [ CrNil of loc
     | CrSem of loc and class_str_item and class_str_item (* cst ; cst *)
     | CrCtr of loc and ctyp and ctyp (* type t = t *)
-    | CrInh of loc and class_expr and string (* inherit ce or inherit ce as s *)
+    | CrInh of loc and override_flag and class_expr and string (* inherit(!)? ce (as s)? *)
     | CrIni of loc and expr (* initializer e *)
-    | CrMth of loc and string and meta_bool and expr and ctyp (* method (private)? s : t = e or method (private)? s = e *)
-    | CrVal of loc and string and meta_bool and expr (* value (mutable)? s = e *)
-    | CrVir of loc and string and meta_bool and ctyp (* method virtual (private)? s : t *)
-    | CrVvr of loc and string and meta_bool and ctyp (* value virtual (private)? s : t *)
+    | CrMth of loc and string and override_flag and private_flag and expr and ctyp (* method(!)? (private)? s : t = e or method(!)? (private)? s = e *)
+    | CrVal of loc and string and override_flag and mutable_flag and expr (* value(!)? (mutable)? s = e *)
+    | CrVir of loc and string and private_flag and ctyp (* method virtual (private)? s : t *)
+    | CrVvr of loc and string and mutable_flag and ctyp (* value virtual (mutable)? s : t *)
     | CrAnt of loc and string (* $s$ *) ];
