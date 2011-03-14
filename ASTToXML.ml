@@ -108,7 +108,7 @@ and print_ctyp f = function (* Representation of types                          
 	(* type t 'a 'b 'c = t constraint t = t constraint t = t *) (** Type declaration *)
 	| TyDcl(loc, name, ctyps, ctyp1, (*TODO*) constraints) -> pp f "<TyDcl loc='%s'><name>%s</name><ctyps>%a</ctyps><ctyp>%a</ctyp><constraints>%a</constraints></TyDcl>" (string_of_loc loc) (escape_string name) print_ctyps ctyps print_ctyp ctyp1 print_constraints constraints
 	(* < (t)? (..)? > *) (* < move : int) -> 'a .. > as 'a  *) (**   Object type *)
-	| TyObj(loc, ctyp1, row_var_flag) -> pp f "<TyObj loc='%s'><ctyp>%a</ctyp><meta_bool>%a</meta_bool></TyObj>" (string_of_loc loc) print_ctyp ctyp1 print_row_var_flag row_var_flag
+	| TyObj(loc, ctyp1, row_var_flag) -> pp f "<TyObj loc='%s'><ctyp>%a</ctyp><row_var>%a</row_var></TyObj>" (string_of_loc loc) print_ctyp ctyp1 print_row_var_flag row_var_flag
 	(* ?s:t *) (** Optional label type *)
 	| TyOlb(loc, name, ctyp1) -> pp f "<TyOlb loc='%s'><name>%s</name><ctyp>%a</ctyp></TyOlb>" (string_of_loc loc) (escape_string name) print_ctyp ctyp1
 	(* ! t . t *) (* ! 'a . list 'a) -> 'a *) (** Polymorphic type *)
@@ -157,7 +157,7 @@ and print_ctyp f = function (* Representation of types                          
 	| TyAmp(loc, ctyp1, ctyp2) -> pp f "<TyAmp loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></TyAmp>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
 	(* t of & t *)
 	| TyOfAmp(loc, ctyp1, ctyp2) -> pp f "<TyOfAmp loc='%s'><ctyp1>%a</ctyp1><ctyp2>%a</ctyp2></TyOfAmp>" (string_of_loc loc) print_ctyp ctyp1 print_ctyp ctyp2
-	(* (module S)  (only on trunk for now) *)
+	(* (module S) *) (** Package type **)
 	| TyPkg (loc, module_type) -> pp f "<TyPkg loc='%s'><module_type>%a</module_type></TyPkg>" (string_of_loc loc) print_module_type module_type
 	(* $s$ *) (** Antiquotation *)
 	| TyAnt(loc, name) -> pp f "<TyAnt loc='%s'><name>%s</name></TyAnt>" (string_of_loc loc) (escape_string name)
@@ -304,12 +304,12 @@ and print_expr f = function (* The type of expressions                          
 	| ExVrn(loc, name) -> pp f "<ExVrn loc='%s'><name>%s</name></ExVrn>" (string_of_loc loc) (escape_string name)
 	(* while e do { e } *) (** "While .. do" constraint *)
 	| ExWhi(loc, expr1, expr2) -> pp f "<ExWhi loc='%s'><expr1>%a</expr1><expr2>%a</expr2></ExWhi>" (string_of_loc loc) print_expr expr1 print_expr expr2
-		(* let open i in e *)
+	(* let open i in e *) (** Local module opening *)
 	| ExOpI (loc, ident, expr) -> pp f "<ExOpI loc='%s'><ident>%a</ident><expr>%a</expr></ExOpI>" (string_of_loc loc) print_ident ident print_expr expr
-		(* fun (type t) -> e *)
-		(* let f x (type t) y z = e *)
+	(* fun (type t) -> e *)
+	(* let f x (type t) y z = e *)
 	| ExFUN (loc, name, expr) -> pp f "<ExFUN loc='%s'><name>%s</name><expr>%a</expr></ExFUN>" (string_of_loc loc) (escape_string name) print_expr expr
-		(* (module ME : S) which is represented as (module (ME : S)) *)
+	(* (module ME : S) which is represented as (module (ME : S)) *) (** expression to pack a module as a first-class value *)
 	| ExPkg (loc, module_expr) -> pp f "<ExPkg loc='%s'><module_expr>%a</module_expr></ExPkg>" (string_of_loc loc) print_module_expr module_expr
 and print_module_type f = function (* The type of module types                                   *)
 	| MtNil(loc) -> pp f "<MtNil loc='%s'></MtNil>" (string_of_loc loc)
