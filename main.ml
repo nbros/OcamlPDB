@@ -1,9 +1,23 @@
-(* main loop: reads commands on the standard input, and prints results on the standard output *)
+(* main loop: reads commands on the standard input, and prints results on  *)
+(* the standard output                                                     *)
 
 (** print the "end of text" character and flush the output *)
 let print_eot	() =
 	print_char '\003';
 	flush stdout
+
+(** fixes a bug on Windows: read_line returns a line that ends with a carriage return *)
+let readline () =
+	let line = read_line() in
+	let length = String.length line in
+	let realline =
+		(if line.[length - 1] = '\r' then
+				String.sub line 0 (length - 1)
+			else
+				line)
+	in
+	realline
+;;
 
 let rec handle_command command commands = match commands with
 	| (c, f) :: _ when c = command -> f()
@@ -15,7 +29,7 @@ let cmd_end () =
 	exit 0;;
 
 let cmd_print () =
-	let str = read_line() in
+	let str = readline() in
 	print_endline str;;
 
 let parse_file filepath =
@@ -47,12 +61,12 @@ let parse_input str =
 	with End_of_file -> None;;
 
 let cmd_print_ast_xml () =
-	let filepath = read_line() in
+	let filepath = readline() in
 	print_endline (ASTToXML.print_ast_in_xml (parse_file filepath))
 ;;
 
 let cmd_print_ast_xml_input () =
-	let strNLines = read_line() in
+	let strNLines = readline() in
 	let nLines =
 		try
 			int_of_string (strNLines)
@@ -61,7 +75,7 @@ let cmd_print_ast_xml_input () =
 	in
 	let buffer = Buffer.create 10000 in
 	for i = 1 to nLines do
-		let line = read_line() in
+		let line = readline() in
 		Buffer.add_string buffer line;
 		Buffer.add_string buffer "\n"
 	done;
@@ -88,8 +102,9 @@ let _ =
 	(* signal that the indexer is successfully started *)
 	print_endline "ok";
 	print_eot();
-	(* main loop: wait for commands on the standard input and print results on the standard output *)
+	(* main loop: wait for commands on the standard input and print results  *)
+	(* on the standard output                                                *)
 	while true do
-		let line = read_line() in
+		let line = readline() in
 		handle_command line commands
 	done

@@ -6,6 +6,6 @@
 		<item value="-I +camlp4 -I +unix -I +dynlink" key="ocamlbuildProjectCompilerFlags"/>
 		<item value="" key="ocamlbuildProjectOtherFlags"/>
 		<item value="true" key="ocamlbuildGenerateTypeInfo"/>
-		<item value="main.d.byte" key="ocamlbuildProjectTargets"/>
+		<item value="main.byte" key="ocamlbuildProjectTargets"/>
 	</section>
 </section>
